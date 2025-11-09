@@ -7,14 +7,14 @@ import os
 
 # ===== CONFIGURACIÓN PARA PYTHONANYWHERE =====
 # IMPORTANTE: Reemplaza 'TU-USUARIO' con tu nombre de usuario de PythonAnywhere
-project_home = '/home/TU-USUARIO/Buscar-direcciones'
+project_home = '/home/timel_ahs/Buscar-direcciones'
 
 # Agregar el directorio del proyecto al Python path
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
 # Importar la aplicación Flask
-from app import app as application
+from app import app as application  
 
 # Configuración para producción
 application.debug = False
