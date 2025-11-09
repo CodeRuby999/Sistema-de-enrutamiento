@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify
 import sqlite3
 import pandas as pd
 import re
-import os
 
 app = Flask(__name__)
 
@@ -32,7 +31,18 @@ def formato_valor_numerico(valor):
         return None
 
 def setup_database():
-    ruta_base_datos = "/home/timel_ahs/Compartidos/Buscar-direcciones/mi_base_datos.sqlite"
+    """
+    Configura la ruta a la base de datos.
+    Detecta automáticamente si está en desarrollo local o en PythonAnywhere.
+    """
+    import os
+    
+    # Obtener el directorio actual del script
+    directorio_actual = os.path.dirname(os.path.abspath(__file__))
+    
+    # Construir la ruta a la base de datos (relativa al directorio del script)
+    ruta_base_datos = os.path.join(directorio_actual, "mi_base_datos.sqlite")
+    
     tabla_principal = "DBACT"
     return {"ruta": ruta_base_datos, "tabla": tabla_principal}
 
@@ -429,7 +439,5 @@ def buscar():
         return jsonify({"error": str(e), "encontrado": False}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') != 'production'
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
