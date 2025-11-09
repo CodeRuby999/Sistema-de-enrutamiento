@@ -7,7 +7,7 @@ import os
 
 # ===== CONFIGURACIÓN PARA PYTHONANYWHERE =====
 # IMPORTANTE: Reemplaza 'TU-USUARIO' con tu nombre de usuario de PythonAnywhere
-project_home = '/home/timel_ahs/Buscar-direcciones'
+project_home = '/home/CodeRuby/Buscar-direcciones'
 
 # Agregar el directorio del proyecto al Python path
 if project_home not in sys.path:
