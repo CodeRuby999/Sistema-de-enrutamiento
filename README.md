@@ -102,3 +102,4 @@ El sistema busca candidatos siguiendo estos criterios:
 - Los candidatos sin ROUTE_ID válido son automáticamente excluidos
 
 
+
