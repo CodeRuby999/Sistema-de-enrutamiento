@@ -1,13 +1,25 @@
 from flask import Flask, render_template, request, jsonify
-import sqlite3
+from sqlalchemy import create_engine
 import pandas as pd
 import re
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 app = Flask(__name__)
 
 # ============== CONFIGURACIÓN ==============
 NUM_CANDIDATOS = 15
 RANGO_PUERTAS = 10
+
+# Configuración de base de datos (PostgreSQL o SQLite para desarrollo local)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    # Fallback a SQLite para desarrollo local si no hay DATABASE_URL
+    directorio_actual = os.path.dirname(os.path.abspath(__file__))
+    DATABASE_URL = f"sqlite:///{os.path.join(directorio_actual, 'mi_base_datos.sqlite')}"
 
 def corrige_utf8(df):
     for col in df.columns:
@@ -32,19 +44,20 @@ def formato_valor_numerico(valor):
 
 def setup_database():
     """
-    Configura la ruta a la base de datos.
-    Detecta automáticamente si está en desarrollo local o en PythonAnywhere.
+    Configura la conexión a la base de datos (PostgreSQL o SQLite).
+    Usa variable de entorno DATABASE_URL para PostgreSQL en producción.
     """
-    import os
+    # Determinar el nombre de la tabla según el tipo de BD
+    # PostgreSQL usa minúsculas por defecto, SQLite puede usar mayúsculas
+    if DATABASE_URL.startswith('postgresql'):
+        tabla_principal = "dbact"  # PostgreSQL (minúsculas)
+    else:
+        tabla_principal = "DBACT"  # SQLite (mayúsculas)
     
-    # Obtener el directorio actual del script
-    directorio_actual = os.path.dirname(os.path.abspath(__file__))
-    
-    # Construir la ruta a la base de datos (relativa al directorio del script)
-    ruta_base_datos = os.path.join(directorio_actual, "mi_base_datos.sqlite")
-    
-    tabla_principal = "DBACT"
-    return {"ruta": ruta_base_datos, "tabla": tabla_principal}
+    return {
+        "url": DATABASE_URL,
+        "tabla": tabla_principal
+    }
 
 def extract_direccion_components(direccion):
     """Extrae componentes estructurados de una dirección, incluyendo intersecciones"""
@@ -227,13 +240,14 @@ def calcular_diferencia_puerta(dir1, dir2):
 def buscar_candidatos(product_id_buscar):
     """Busca candidatos para un PRODUCT_ID dado"""
     config = setup_database()
-    con = sqlite3.connect(config["ruta"])
+    engine = create_engine(config["url"])
     
     try:
         # Buscar el producto
+        # Usar %s para PostgreSQL, pero funciona también con SQLite vía SQLAlchemy
         info_producto = pd.read_sql_query(
-            f"SELECT * FROM {config['tabla']} WHERE PRODUCT_ID = ?", 
-            con, params=[product_id_buscar])
+            f'SELECT * FROM {config["tabla"]} WHERE "PRODUCT_ID" = %s', 
+            engine, params=[product_id_buscar])
         info_producto = corrige_utf8(info_producto)
         
         if info_producto.empty:
@@ -252,15 +266,15 @@ def buscar_candidatos(product_id_buscar):
         query = f"""
         SELECT *, '{config['tabla']}' AS fuente 
         FROM {config['tabla']} 
-        WHERE DPTO = ? 
-        AND MUNICIPIO = ? 
-        AND LOCALIDAD = ?
-        AND PRODUCT_ID != ?
-        AND ROUTE_ID IS NOT NULL
+        WHERE "DPTO" = %s 
+        AND "MUNICIPIO" = %s 
+        AND "LOCALIDAD" = %s
+        AND "PRODUCT_ID" != %s
+        AND "ROUTE_ID" IS NOT NULL
         """
         
         resultados = pd.read_sql_query(
-            query, con, 
+            query, engine, 
             params=[info_producto['DPTO'], info_producto['MUNICIPIO'], 
                     info_producto['LOCALIDAD'], product_id_buscar])
         resultados = corrige_utf8(resultados)
@@ -417,8 +431,11 @@ def buscar_candidatos(product_id_buscar):
             "recomendacion": recomendacion
         }
         
-    finally:
-        con.close()
+    except Exception as e:
+        return {
+            "error": f"Error al buscar candidatos: {str(e)}",
+            "encontrado": False
+        }
 
 @app.route('/')
 def index():
