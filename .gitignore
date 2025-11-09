@@ -1,0 +1,114 @@
+# ============== BASE DE DATOS Y DATOS ==============
+# Excluir archivos de base de datos
+*.sqlite
+*.db
+mi_base_datos.sqlite
+
+# Excluir archivos CSV con datos
+*.csv
+BD31oct.csv
+
+# ============== ARCHIVOS NO UTILIZADOS ==============
+# Scripts antiguos/no utilizados
+abrirBD31.py
+encontrar_candidatos.py
+encontrar_candidatosV2.py
+import os 1.py
+nuevo 1.py
+
+# ============== PYTHON ==============
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ============== IDEs Y EDITORES ==============
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ============== SISTEMA OPERATIVO ==============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ============== OTROS ==============
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+
+# Variables de entorno
+.env
+.env.local
+
+# Archivos de configuración local
+config.local.py
+
