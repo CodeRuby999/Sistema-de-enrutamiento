@@ -1,25 +1,12 @@
 from flask import Flask, render_template, request, jsonify
-from sqlalchemy import create_engine
+import sqlite3
 import pandas as pd
 import re
-import os
-from dotenv import load_dotenv
-
-# Cargar variables de entorno desde .env
-load_dotenv()
 
 app = Flask(__name__)
 
 # ============== CONFIGURACIÓN ==============
-NUM_CANDIDATOS = 15
-RANGO_PUERTAS = 10
-
-# Configuración de base de datos (PostgreSQL o SQLite para desarrollo local)
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if not DATABASE_URL:
-    # Fallback a SQLite para desarrollo local si no hay DATABASE_URL
-    directorio_actual = os.path.dirname(os.path.abspath(__file__))
-    DATABASE_URL = f"sqlite:///{os.path.join(directorio_actual, 'mi_base_datos.sqlite')}"
+# (Sin variables de configuración - la lógica busca solo vecinos inmediatos)
 
 def corrige_utf8(df):
     for col in df.columns:
@@ -43,21 +30,9 @@ def formato_valor_numerico(valor):
         return None
 
 def setup_database():
-    """
-    Configura la conexión a la base de datos (PostgreSQL o SQLite).
-    Usa variable de entorno DATABASE_URL para PostgreSQL en producción.
-    """
-    # Determinar el nombre de la tabla según el tipo de BD
-    # PostgreSQL usa minúsculas por defecto, SQLite puede usar mayúsculas
-    if DATABASE_URL.startswith('postgresql'):
-        tabla_principal = "dbact"  # PostgreSQL (minúsculas)
-    else:
-        tabla_principal = "DBACT"  # SQLite (mayúsculas)
-    
-    return {
-        "url": DATABASE_URL,
-        "tabla": tabla_principal
-    }
+    ruta_base_datos = "/home/timel_ahs/Compartidos/Buscar-direcciones/mi_base_datos.sqlite"
+    tabla_principal = "DBACT"
+    return {"ruta": ruta_base_datos, "tabla": tabla_principal}
 
 def extract_direccion_components(direccion):
     """Extrae componentes estructurados de una dirección, incluyendo intersecciones"""
@@ -240,14 +215,13 @@ def calcular_diferencia_puerta(dir1, dir2):
 def buscar_candidatos(product_id_buscar):
     """Busca candidatos para un PRODUCT_ID dado"""
     config = setup_database()
-    engine = create_engine(config["url"])
+    con = sqlite3.connect(config["ruta"])
     
     try:
         # Buscar el producto
-        # Usar %s para PostgreSQL, pero funciona también con SQLite vía SQLAlchemy
         info_producto = pd.read_sql_query(
-            f'SELECT * FROM {config["tabla"]} WHERE "PRODUCT_ID" = %s', 
-            engine, params=[product_id_buscar])
+            f"SELECT * FROM {config['tabla']} WHERE PRODUCT_ID = ?", 
+            con, params=[product_id_buscar])
         info_producto = corrige_utf8(info_producto)
         
         if info_producto.empty:
@@ -266,15 +240,15 @@ def buscar_candidatos(product_id_buscar):
         query = f"""
         SELECT *, '{config['tabla']}' AS fuente 
         FROM {config['tabla']} 
-        WHERE "DPTO" = %s 
-        AND "MUNICIPIO" = %s 
-        AND "LOCALIDAD" = %s
-        AND "PRODUCT_ID" != %s
-        AND "ROUTE_ID" IS NOT NULL
+        WHERE DPTO = ? 
+        AND MUNICIPIO = ? 
+        AND LOCALIDAD = ?
+        AND PRODUCT_ID != ?
+        AND ROUTE_ID IS NOT NULL
         """
         
         resultados = pd.read_sql_query(
-            query, engine, 
+            query, con, 
             params=[info_producto['DPTO'], info_producto['MUNICIPIO'], 
                     info_producto['LOCALIDAD'], product_id_buscar])
         resultados = corrige_utf8(resultados)
@@ -357,24 +331,13 @@ def buscar_candidatos(product_id_buscar):
             if not candidatos_posteriores.empty:
                 vecino_posterior = candidatos_posteriores.nsmallest(1, "numero_puerta")
                 candidatos_finales = pd.concat([candidatos_finales, vecino_posterior], ignore_index=True)
-            
-            # Si no hay vecinos inmediatos, buscar los más cercanos dentro del rango
-            if candidatos_finales.empty:
-                candidatos_en_rango = candidatos_validos[
-                    candidatos_validos["diferencia_puerta"] <= RANGO_PUERTAS]
-                
-                if not candidatos_en_rango.empty:
-                    candidatos_finales = candidatos_en_rango.nsmallest(NUM_CANDIDATOS, "diferencia_puerta")
-                else:
-                    # Si no hay en el rango, tomar los N más cercanos
-                    candidatos_finales = candidatos_validos.nsmallest(NUM_CANDIDATOS, "diferencia_puerta")
         else:
-            # Si no hay número de puerta original, tomar los más cercanos
-            candidatos_finales = candidatos_validos.nsmallest(NUM_CANDIDATOS, "diferencia_puerta")
+            # Si no hay número de puerta original, tomar los 10 más cercanos
+            candidatos_finales = candidatos_validos.nsmallest(10, "diferencia_puerta")
         
-        # Ordenar por número de puerta si existe
-        if not candidatos_finales.empty and numero_puerta_original:
-            candidatos_finales = candidatos_finales.sort_values("numero_puerta", na_position='last')
+        # Ordenar por diferencia de puerta (más cercano primero)
+        if not candidatos_finales.empty:
+            candidatos_finales = candidatos_finales.sort_values("diferencia_puerta", na_position='last')
         
         if candidatos_finales.empty:
             return {
@@ -431,11 +394,8 @@ def buscar_candidatos(product_id_buscar):
             "recomendacion": recomendacion
         }
         
-    except Exception as e:
-        return {
-            "error": f"Error al buscar candidatos: {str(e)}",
-            "encontrado": False
-        }
+    finally:
+        con.close()
 
 @app.route('/')
 def index():
