@@ -611,24 +611,7 @@
             // Mostrar candidatos
             if (data.candidatos && data.candidatos.length > 0) {
                 const candidatosList = document.getElementById('candidatosList');
-                
-                // Mostrar advertencia si son candidatos sugeridos
-                let advertenciaHtml = '';
-                if (data.son_sugeridos && data.mensaje_advertencia) {
-                    advertenciaHtml = `
-                        <div style="background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%); border-radius: 10px; padding: 20px; margin-bottom: 20px; color: white; box-shadow: 0 4px 15px rgba(255, 87, 34, 0.3);">
-                            <div style="display: flex; align-items: center; gap: 15px;">
-                                <i class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
-                                <div>
-                                    <h3 style="margin: 0 0 8px 0; font-size: 1.2rem;">Dirección Exacta No Encontrada</h3>
-                                    <p style="margin: 0; font-size: 1rem; opacity: 0.95;">${data.mensaje_advertencia}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                candidatosList.innerHTML = advertenciaHtml + data.candidatos.map((candidato, index) => `
+                candidatosList.innerHTML = data.candidatos.map((candidato, index) => `
                     <div class="candidato-card">
                         <div class="candidato-header">
                             <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${candidato.PRODUCT_ID}</span>
