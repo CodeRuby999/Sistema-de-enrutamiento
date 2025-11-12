@@ -50,6 +50,27 @@
             border-left-color: #4db8ff;
         }
 
+        body.dark-mode .candidato-direccion {
+            background: rgba(77, 184, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .candidato-direccion strong {
+            color: #4db8ff;
+        }
+
+        body.dark-mode .candidato-info-item {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        body.dark-mode .candidato-info-label {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .candidato-info-value {
+            color: #e0e0e0;
+        }
+
         body.dark-mode input[type="number"] {
             background: #1a1a2e;
             color: #e0e0e0;
@@ -284,19 +305,48 @@
             background: #10b981;
         }
 
+        .candidato-direccion {
+            background: rgba(102, 126, 234, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .candidato-direccion strong {
+            color: #667eea;
+            margin-right: 8px;
+        }
+
         .candidato-info {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
         }
 
         .candidato-info-item {
+            background: rgba(0, 0, 0, 0.02);
+            padding: 10px 12px;
+            border-radius: 6px;
             font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .candidato-info-label {
             font-weight: 600;
             color: #666;
+            margin-right: 10px;
+        }
+
+        .candidato-info-value {
+            color: #333;
+            font-weight: 500;
+            flex: 1;
+            text-align: right;
+            margin-right: 8px;
         }
 
         .candidato-copy-btn {
@@ -411,6 +461,21 @@
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 10px;
+            }
+
+            .candidato-info {
+                grid-template-columns: 1fr;
+            }
+
+            .candidato-info-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .candidato-info-value {
+                text-align: left;
+                margin-right: 0;
             }
         }
     </style>
@@ -552,29 +617,36 @@
                             <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${candidato.PRODUCT_ID}</span>
                             ${candidato.tipo_candidato ? `<span class="candidato-tipo ${candidato.tipo_candidato.includes('anterior') ? 'anterior' : 'posterior'}">${candidato.tipo_candidato}</span>` : ''}
                         </div>
+                        
+                        <div class="candidato-direccion">
+                            <strong><i class="fas fa-map-marker-alt"></i> Dirección:</strong> ${candidato.DIRECCION}
+                        </div>
+                        
                         <div class="candidato-info">
                             <div class="candidato-info-item">
-                                <span class="candidato-info-label">Dirección:</span> ${candidato.DIRECCION}
-                            </div>
-                            <div class="candidato-info-item">
-                                <span class="candidato-info-label">ROUTE_ID:</span> ${candidato.ROUTE_ID}
+                                <span class="candidato-info-label">ROUTE_ID:</span>
+                                <span class="candidato-info-value">${candidato.ROUTE_ID}</span>
                                 <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.ROUTE_ID}', this)"><i class="fas fa-copy"></i></button>
                             </div>
                             <div class="candidato-info-item">
-                                <span class="candidato-info-label">ITINERARIO:</span> ${candidato.ITINERARIO}
+                                <span class="candidato-info-label">ITINERARIO:</span>
+                                <span class="candidato-info-value">${candidato.ITINERARIO}</span>
                                 <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.ITINERARIO}', this)"><i class="fas fa-copy"></i></button>
                             </div>
                             <div class="candidato-info-item">
-                                <span class="candidato-info-label">SECUENCIA:</span> ${candidato.SECUENCIA}
+                                <span class="candidato-info-label">SECUENCIA:</span>
+                                <span class="candidato-info-value">${candidato.SECUENCIA}</span>
                                 <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.SECUENCIA}', this)"><i class="fas fa-copy"></i></button>
                             </div>
                             <div class="candidato-info-item">
-                                <span class="candidato-info-label">Ciclo:</span> ${candidato.CICLO}
+                                <span class="candidato-info-label">Ciclo:</span>
+                                <span class="candidato-info-value">${candidato.CICLO}</span>
                                 <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.CICLO}', this)"><i class="fas fa-copy"></i></button>
                             </div>
                             ${candidato.diferencia_puerta !== null ? `
-                            <div class="candidato-info-item">
-                                <span class="candidato-info-label">Diferencia:</span> ${candidato.diferencia_puerta} ${candidato.diferencia_puerta === 1 ? 'puerta' : 'puertas'}
+                            <div class="candidato-info-item" style="grid-column: 1 / -1; background: rgba(102, 126, 234, 0.1);">
+                                <span class="candidato-info-label"><i class="fas fa-ruler-horizontal"></i> Diferencia:</span>
+                                <span class="candidato-info-value" style="color: #667eea; font-weight: 700;">${candidato.diferencia_puerta} ${candidato.diferencia_puerta === 1 ? 'puerta' : 'puertas'}</span>
                             </div>
                             ` : ''}
                         </div>
