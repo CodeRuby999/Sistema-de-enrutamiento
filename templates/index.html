@@ -502,14 +502,15 @@
             <p style="margin-top: 15px; color: white; font-weight: 600;">Buscando...</p>
         </div>
 
-        <div class="error-message" id="errorMessage"></div>
-
         <div class="results" id="results">
             <!-- Producto encontrado -->
             <div class="producto-card">
                 <h2><i class="fas fa-check-circle"></i> Producto Encontrado</h2>
                 <div class="info-grid" id="productoInfo"></div>
             </div>
+
+            <!-- Mensaje de error (si no hay candidatos) -->
+            <div class="error-message" id="errorMessage"></div>
 
             <!-- Candidatos -->
             <div class="candidatos-section" id="candidatosSection">
@@ -558,12 +559,18 @@
                 document.getElementById('loading').style.display = 'none';
                 document.querySelector('.btn-search').disabled = false;
 
-                if (!data.encontrado || data.error) {
+                if (!data.encontrado) {
                     mostrarError(data.error || 'No se encontraron resultados');
                     return;
                 }
 
-                mostrarResultados(data);
+                // Si se encontró el producto pero hay un error (sin candidatos), mostrar producto y error
+                if (data.error && data.producto) {
+                    mostrarResultados(data);
+                    mostrarError(data.error);
+                } else {
+                    mostrarResultados(data);
+                }
 
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
@@ -579,6 +586,9 @@
         }
 
         function mostrarResultados(data) {
+            // Mostrar la sección de resultados primero
+            document.getElementById('results').classList.add('show');
+            
             // Mostrar información del producto
             const productoInfo = document.getElementById('productoInfo');
             productoInfo.innerHTML = `
@@ -756,9 +766,6 @@
             } else {
                 document.getElementById('recomendacionCard').style.display = 'none';
             }
-
-            // Mostrar resultados
-            document.getElementById('results').classList.add('show');
         }
 
         // Función para copiar texto al portapapeles
