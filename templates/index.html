@@ -611,7 +611,24 @@
             // Mostrar candidatos
             if (data.candidatos && data.candidatos.length > 0) {
                 const candidatosList = document.getElementById('candidatosList');
-                candidatosList.innerHTML = data.candidatos.map((candidato, index) => `
+                
+                // Mostrar advertencia si son candidatos sugeridos
+                let advertenciaHtml = '';
+                if (data.son_sugeridos && data.mensaje_advertencia) {
+                    advertenciaHtml = `
+                        <div style="background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%); border-radius: 10px; padding: 20px; margin-bottom: 20px; color: white; box-shadow: 0 4px 15px rgba(255, 87, 34, 0.3);">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
+                                <div>
+                                    <h3 style="margin: 0 0 8px 0; font-size: 1.2rem;">Dirección Exacta No Encontrada</h3>
+                                    <p style="margin: 0; font-size: 1rem; opacity: 0.95;">${data.mensaje_advertencia}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                candidatosList.innerHTML = advertenciaHtml + data.candidatos.map((candidato, index) => `
                     <div class="candidato-card">
                         <div class="candidato-header">
                             <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${candidato.PRODUCT_ID}</span>
@@ -646,7 +663,7 @@
                             ${candidato.diferencia_puerta !== null ? `
                             <div class="candidato-info-item" style="grid-column: 1 / -1; background: rgba(102, 126, 234, 0.1);">
                                 <span class="candidato-info-label"><i class="fas fa-ruler-horizontal"></i> Diferencia:</span>
-                                <span class="candidato-info-value" style="color: #667eea; font-weight: 700;">${candidato.diferencia_puerta} ${candidato.diferencia_puerta === 1 ? 'puerta' : 'puertas'}</span>
+                                <span class="candidato-info-value" style="color: #667eea; font-weight: 700;">${candidato.diferencia_puerta} ${candidato.diferencia_puerta === 1 ? 'metro' : 'metros'}</span>
                             </div>
                             ` : ''}
                         </div>
@@ -704,7 +721,7 @@
                     ${data.recomendacion.diferencia_puerta !== null ? `
                     <div class="recomendacion-item">
                         <div class="recomendacion-label">Distancia:</div>
-                        <div class="recomendacion-value">${data.recomendacion.diferencia_puerta} ${data.recomendacion.diferencia_puerta === 1 ? 'puerta' : 'puertas'} de la dirección buscada</div>
+                        <div class="recomendacion-value">${data.recomendacion.diferencia_puerta} ${data.recomendacion.diferencia_puerta === 1 ? 'metro' : 'metros'} de la dirección buscada</div>
                     </div>
                     ` : ''}
                     <div class="recomendacion-item">

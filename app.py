@@ -81,16 +81,16 @@ def extract_direccion_components(direccion):
         # Es una intersección: CR 19 CL 126 - 10 o CL 123 CR 19 B - 11 o CR 19A CL 123
         if len(numeros) >= 1:
             via_principal = numeros[0]  # 19 o 123
-            # Buscar letra después del primer número (con o sin espacio): 19A, 19 A, etc
-            patron_letra_1 = rf'\b{via_principal}\s*([A-Z])(?:\s|$|[^A-Z0-9])'
+            # Buscar TODAS las letras después del primer número: 19A, 19EESTE, 19 A, etc
+            patron_letra_1 = rf'\b{via_principal}\s*([A-Z]+(?:BIS|ESTE)?)\b'
             match_letra_1 = re.search(patron_letra_1, direccion)
             if match_letra_1:
                 via_principal_letra = match_letra_1.group(1)
         
         if len(numeros) >= 2:
             via_secundaria = numeros[1]  # 126 o 19
-            # Buscar letra después del segundo número (con o sin espacio): 19A, 19 A, etc
-            patron_letra_2 = rf'\b{via_secundaria}\s*([A-Z])(?:\s|$|[^A-Z0-9])'
+            # Buscar TODAS las letras después del segundo número: 126A, 3ABIS, etc
+            patron_letra_2 = rf'\b{via_secundaria}\s*([A-Z]+(?:BIS|ESTE)?)\b'
             match_letra_2 = re.search(patron_letra_2, direccion)
             if match_letra_2:
                 via_secundaria_letra = match_letra_2.group(1)
@@ -101,8 +101,8 @@ def extract_direccion_components(direccion):
         # Es una dirección simple: CL 45 # 23-67 o CL 45 A # 23-67 o CL 45A # 23-67
         if len(numeros) >= 1:
             via_principal = numeros[0]
-            # Buscar letra después del número principal (con o sin espacio): 45A, 45 A, etc
-            patron_letra = rf'\b{via_principal}\s*([A-Z])(?:\s|$|[^A-Z0-9])'
+            # Buscar TODAS las letras después del número principal: 45A, 45ABIS, etc
+            patron_letra = rf'\b{via_principal}\s*([A-Z]+(?:BIS|ESTE)?)\b'
             match_letra = re.search(patron_letra, direccion)
             if match_letra:
                 via_principal_letra = match_letra.group(1)
@@ -278,13 +278,25 @@ def buscar_candidatos(product_id_buscar):
         
         candidatos_misma_calle = resultados[resultados["es_misma_direccion"] == True].copy()
         
+        # Flag para indicar si se encontraron coincidencias exactas o solo sugeridos
+        son_sugeridos = False
+        mensaje_advertencia = None
+        
         if candidatos_misma_calle.empty:
-            return {
-                "error": "No se encontraron candidatos en la misma dirección",
-                "encontrado": True,
-                "producto": producto_info,
-                "candidatos": []
-            }
+            # No se encontró la dirección exacta, buscar candidatos sugeridos cercanos
+            son_sugeridos = True
+            mensaje_advertencia = "⚠️ No se encontraron vecinos en la dirección exacta. Mostrando candidatos sugeridos en direcciones cercanas:"
+            
+            # Buscar los 10 más cercanos en la misma localidad (sin filtro de dirección exacta)
+            # Calcular diferencias aproximadas basadas solo en números de puerta
+            resultados["numero_puerta_temp"] = resultados["DIRECCION"].apply(obtener_numero_puerta)
+            if numero_puerta_original:
+                resultados["diferencia_aproximada"] = resultados["numero_puerta_temp"].apply(
+                    lambda x: abs(int(x) - numero_puerta_original) if x else 9999
+                )
+                candidatos_misma_calle = resultados.nsmallest(10, "diferencia_aproximada").copy()
+            else:
+                candidatos_misma_calle = resultados.head(10).copy()
         
         # Calcular métricas una sola vez
         candidatos_misma_calle["numero_puerta"] = candidatos_misma_calle["DIRECCION"].apply(obtener_numero_puerta)
@@ -425,6 +437,8 @@ def buscar_candidatos(product_id_buscar):
             "producto": producto_info,
             "candidatos": candidatos_list,
             "recomendacion": recomendacion,
+            "son_sugeridos": son_sugeridos,
+            "mensaje_advertencia": mensaje_advertencia,
             "vecinos_info": {
                 "anteriores_encontrados": vecinos_encontrados["anteriores"],
                 "posteriores_encontrados": vecinos_encontrados["posteriores"],
