@@ -245,6 +245,8 @@ def buscar_candidatos(product_id_buscar):
         AND LOCALIDAD = ?
         AND PRODUCT_ID != ?
         AND ROUTE_ID IS NOT NULL
+        AND SESUCICL != 9000
+        AND SESUCICL != 4000
         """
         
         resultados = pd.read_sql_query(
@@ -307,30 +309,32 @@ def buscar_candidatos(product_id_buscar):
                 "candidatos": []
             }
         
-        # Lógica optimizada: buscar vecinos inmediatos (anterior, mismo número, y posterior)
+        # Lógica optimizada: buscar 2 vecinos anteriores y 2 posteriores más cercanos
         candidatos_finales = pd.DataFrame()
+        vecinos_encontrados = {"anteriores": 0, "posteriores": 0}
         
         if numero_puerta_original:
-            # Buscar vecino inmediato anterior
+            # Buscar los 2 vecinos anteriores más cercanos
             candidatos_anteriores = candidatos_validos[
                 candidatos_validos["numero_puerta"] < numero_puerta_original]
             if not candidatos_anteriores.empty:
-                vecino_anterior = candidatos_anteriores.nlargest(1, "numero_puerta")
-                candidatos_finales = pd.concat([candidatos_finales, vecino_anterior], ignore_index=True)
+                vecinos_anteriores = candidatos_anteriores.nlargest(2, "numero_puerta")
+                candidatos_finales = pd.concat([candidatos_finales, vecinos_anteriores], ignore_index=True)
+                vecinos_encontrados["anteriores"] = len(vecinos_anteriores)
             
             # Buscar direcciones con el mismo número de puerta (mismo edificio/dirección base)
-            # Excluir el producto original comparando PRODUCT_ID
             candidatos_mismo_numero = candidatos_validos[
                 candidatos_validos["numero_puerta"] == numero_puerta_original]
             if not candidatos_mismo_numero.empty:
                 candidatos_finales = pd.concat([candidatos_finales, candidatos_mismo_numero], ignore_index=True)
             
-            # Buscar vecino inmediato posterior
+            # Buscar los 2 vecinos posteriores más cercanos
             candidatos_posteriores = candidatos_validos[
                 candidatos_validos["numero_puerta"] > numero_puerta_original]
             if not candidatos_posteriores.empty:
-                vecino_posterior = candidatos_posteriores.nsmallest(1, "numero_puerta")
-                candidatos_finales = pd.concat([candidatos_finales, vecino_posterior], ignore_index=True)
+                vecinos_posteriores = candidatos_posteriores.nsmallest(2, "numero_puerta")
+                candidatos_finales = pd.concat([candidatos_finales, vecinos_posteriores], ignore_index=True)
+                vecinos_encontrados["posteriores"] = len(vecinos_posteriores)
         else:
             # Si no hay número de puerta original, tomar los 10 más cercanos
             candidatos_finales = candidatos_validos.nsmallest(10, "diferencia_puerta")
@@ -370,6 +374,7 @@ def buscar_candidatos(product_id_buscar):
                 "ROUTE_ID": formato_valor_numerico(row['ROUTE_ID']),
                 "ITINERARIO": formato_valor_numerico(row['ROUTE_ITINERARY_ID']),
                 "SECUENCIA": formato_valor_numerico(row['CONSECUTIVE']),
+                "CICLO": formato_valor_numerico(row['SESUCICL']),
                 "diferencia_puerta": int(row['diferencia_puerta']) if pd.notna(row['diferencia_puerta']) else None,
                 "tipo_candidato": tipo_candidato
             })
@@ -384,14 +389,51 @@ def buscar_candidatos(product_id_buscar):
                 "ROUTE_ID": candidato_rec["ROUTE_ID"],
                 "ITINERARIO": candidato_rec["ITINERARIO"],
                 "SECUENCIA": candidato_rec["SECUENCIA"],
+                "CICLO": candidato_rec["CICLO"],
                 "diferencia_puerta": candidato_rec["diferencia_puerta"]
             }
+        
+        # Análisis de itinerarios
+        itinerarios_contador = {}
+        for candidato in candidatos_list:
+            itinerario = candidato["ITINERARIO"]
+            if itinerario is not None:
+                itinerarios_contador[itinerario] = itinerarios_contador.get(itinerario, 0) + 1
+        
+        # Preparar información de itinerarios
+        itinerarios_unicos = len(itinerarios_contador)
+        itinerarios_detalle = [
+            {"itinerario": itinerario, "cantidad": cantidad}
+            for itinerario, cantidad in sorted(itinerarios_contador.items(), key=lambda x: x[1], reverse=True)
+        ]
+        
+        # Preparar mensajes de vecinos no encontrados
+        mensajes_info = []
+        if numero_puerta_original:
+            if vecinos_encontrados["anteriores"] == 0:
+                mensajes_info.append("No se encontraron vecinos anteriores")
+            elif vecinos_encontrados["anteriores"] == 1:
+                mensajes_info.append("Solo se encontró 1 vecino anterior")
+            
+            if vecinos_encontrados["posteriores"] == 0:
+                mensajes_info.append("No se encontraron vecinos posteriores")
+            elif vecinos_encontrados["posteriores"] == 1:
+                mensajes_info.append("Solo se encontró 1 vecino posterior")
         
         return {
             "encontrado": True,
             "producto": producto_info,
             "candidatos": candidatos_list,
-            "recomendacion": recomendacion
+            "recomendacion": recomendacion,
+            "vecinos_info": {
+                "anteriores_encontrados": vecinos_encontrados["anteriores"],
+                "posteriores_encontrados": vecinos_encontrados["posteriores"],
+                "mensajes": mensajes_info
+            },
+            "itinerarios_info": {
+                "total_unicos": itinerarios_unicos,
+                "detalle": itinerarios_detalle
+            }
         }
         
     finally:
