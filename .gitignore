@@ -6,7 +6,7 @@ mi_base_datos.sqlite
 
 # Excluir archivos CSV con datos
 *.csv
-BD31oct.csv
+BD13NOV.csv
 
 # ============== ARCHIVOS NO UTILIZADOS ==============
 # Scripts antiguos/no utilizados

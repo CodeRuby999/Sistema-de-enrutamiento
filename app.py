@@ -8,6 +8,65 @@ app = Flask(__name__)
 # ============== CONFIGURACIÓN ==============
 # (Sin variables de configuración - la lógica busca solo vecinos inmediatos)
 
+def normalizar_direccion_completa(direccion):
+    """
+    Normaliza direcciones colombianas aplicando reglas estándar
+    Basado en normalizaciones de KNIME pero mejorado para Python
+    """
+    if not direccion or pd.isna(direccion):
+        return direccion
+    
+    direccion = str(direccion).upper().strip()
+    
+    # 1. Reemplazar guiones y caracteres especiales por espacio
+    direccion = direccion.replace('-', ' - ')  # Mantener guión con espacios para identificar número puerta
+    direccion = direccion.replace('#', ' ')
+    direccion = direccion.replace('.', ' ')
+    direccion = direccion.replace(',', '')
+    
+    # 2. Normalizar tipos de vía (ANTES de agregar espacios)
+    tipos_via = {
+        'CARRERA': 'CR', 'KRA': 'CR', 'CRA': 'CR', 'CRÂ': 'CR',
+        'CALLE': 'CL', 'CLLE': 'CL', 'CLE': 'CL', 'CLL': 'CL',
+        'DIAGONAL': 'DG', 'DIAG': 'DG',
+        'TRANSVERSAL': 'TR', 'TRANVERSAL': 'TR', 'TRANSV': 'TR', 'TV': 'TR',
+        'CARRETERA': 'CARRET', 'SZ': 'SECTOR'
+    }
+    
+    for original, normalizado in tipos_via.items():
+        direccion = direccion.replace(original, normalizado)
+    
+    # 3. Agregar espacios alrededor de tipos de vía para delimitarlos
+    for tipo in ['CR', 'CL', 'DG', 'TR', 'NR', 'AV']:
+        # Agregar espacio DESPUÉS del tipo de vía si no lo tiene
+        direccion = re.sub(rf'\b{tipo}(?=[A-Z0-9])', f'{tipo} ', direccion)
+        # Agregar espacio ANTES del tipo de vía si no lo tiene
+        direccion = re.sub(rf'([A-Z0-9]){tipo}\b', rf'\1 {tipo}', direccion)
+    
+    # 4. Separar números pegados a letras (CRÍTICO para casos como 9J2, 70C)
+    # Letra seguida de número: A1 -> A 1
+    direccion = re.sub(r'([A-Z])([0-9])', r'\1 \2', direccion)
+    # Número seguido de letra: 1A -> 1 A (pero no si la letra es parte de orientación)
+    direccion = re.sub(r'([0-9])([A-Z])(?![A-Z]*(?:ESTE|OESTE|NORTE|SUR|BIS))', r'\1 \2', direccion)
+    
+    # 5. Normalizar sufijos (sin espacios internos)
+    sufijos = {
+        ' BIS ': 'BIS ', ' ESTE ': 'ESTE ', ' OESTE ': 'OESTE ', 
+        ' NORTE ': 'NORTE ', ' SUR ': 'SUR '
+    }
+    for original, normalizado in sufijos.items():
+        direccion = direccion.replace(original, normalizado)
+    
+    # 6. Normalizar letras individuales seguidas de número (D1, A1, etc)
+    # D1 -> D 1, A1 -> A 1, etc.
+    for letra in 'ABCDEFGHLNFG':
+        direccion = direccion.replace(f' {letra}1 ', f' {letra} 1 ')
+    
+    # 7. Limpiar espacios múltiples (al final después de todas las transformaciones)
+    direccion = ' '.join(direccion.split())
+    
+    return direccion
+
 def corrige_utf8(df):
     for col in df.columns:
         if df[col].dtype == object:
@@ -36,8 +95,18 @@ def setup_database():
 
 def extract_direccion_components(direccion):
     """Extrae componentes estructurados de una dirección, incluyendo intersecciones"""
-    direccion = str(direccion).strip().upper()
-    # Extraer números (permite números pegados a letras como 19A)
+    # Normalizar PRIMERO
+    direccion_original = str(direccion).strip().upper()
+    direccion = normalizar_direccion_completa(direccion_original)
+    
+    # CRÍTICO: Identificar número de puerta ANTES de extraer todos los números
+    # El número de puerta es el que aparece después de " - " o como último número significativo
+    numero_puerta = None
+    match_puerta = re.search(r'-\s*(\d+)', direccion)
+    if match_puerta:
+        numero_puerta = match_puerta.group(1)
+    
+    # Extraer todos los números
     numeros = re.findall(r'[0-9]+', direccion)
     
     # Detectar primer tipo de vía
@@ -72,43 +141,41 @@ def extract_direccion_components(direccion):
         tipo_via_2 = "AVENIDA"
         es_interseccion = True
     
-    # Extraer vía principal, vía secundaria y número de puerta
+    # Extraer vía principal y secundaria
     via_principal = None
     via_principal_letra = None
-    numero_puerta = None
+    
+    # Filtrar números que NO son el número de puerta para identificar vías
+    numeros_via = [n for n in numeros if n != numero_puerta]
     
     if es_interseccion:
-        # Es una intersección: CR 19 CL 126 - 10 o CL 123 CR 19 B - 11 o CR 19A CL 123
-        if len(numeros) >= 1:
-            via_principal = numeros[0]  # 19 o 123
-            # Buscar letras después del primer número (con o sin espacio): 19A, 19EESTE, etc
-            patron_letra_1 = rf'\b{via_principal}\s*([A-Z]+)(?:\s|$|[^A-Z0-9])'
+        # Es una intersección: CR 19 CL 126 - 10 o CL 123 CR 19 B - 11 o CR 19 J 2 CL 123
+        if len(numeros_via) >= 1:
+            via_principal = numeros_via[0]  # Primer número es la vía principal
+            # Buscar letras/componentes después del primer número hasta encontrar el siguiente tipo de vía
+            # Ejemplo: "70 C" -> letra="C", "9 J 2" -> letra="J2"
+            patron_letra_1 = rf'\b{via_principal}\s+([A-Z]+(?:\s+[A-Z0-9]+)*?)(?=\s+(?:CR|CL|DG|TR|AV)\s|\s*-|$)'
             match_letra_1 = re.search(patron_letra_1, direccion)
             if match_letra_1:
-                via_principal_letra = match_letra_1.group(1)
+                # Quitar espacios internos: "J 2" -> "J2"
+                via_principal_letra = match_letra_1.group(1).replace(' ', '')
         
-        if len(numeros) >= 2:
-            via_secundaria = numeros[1]  # 126 o 19
-            # Buscar letras después del segundo número (con o sin espacio): 19A, 3ABIS, etc
-            patron_letra_2 = rf'\b{via_secundaria}\s*([A-Z]+)(?:\s|$|[^A-Z0-9])'
+        if len(numeros_via) >= 2:
+            via_secundaria = numeros_via[1]  # Segundo número es la vía secundaria
+            # Buscar letras/componentes después del segundo número hasta el guión o final
+            patron_letra_2 = rf'\b{via_secundaria}\s+([A-Z]+(?:\s+[A-Z0-9]+)*?)(?=\s*-|$)'
             match_letra_2 = re.search(patron_letra_2, direccion)
             if match_letra_2:
-                via_secundaria_letra = match_letra_2.group(1)
-        
-        if len(numeros) >= 3:
-            numero_puerta = numeros[2]  # 10 o 11
+                via_secundaria_letra = match_letra_2.group(1).replace(' ', '')
     else:
         # Es una dirección simple: CL 45 # 23-67 o CL 45 A # 23-67 o CL 45A # 23-67
-        if len(numeros) >= 1:
-            via_principal = numeros[0]
-            # Buscar letras después del número principal (con o sin espacio): 45A, 45BIS, etc
-            patron_letra = rf'\b{via_principal}\s*([A-Z]+)(?:\s|$|[^A-Z0-9])'
+        if len(numeros_via) >= 1:
+            via_principal = numeros_via[0]
+            # Buscar letras después del número principal hasta el guión o final
+            patron_letra = rf'\b{via_principal}\s+([A-Z]+(?:\s+[A-Z0-9]+)*?)(?=\s*-|$)'
             match_letra = re.search(patron_letra, direccion)
             if match_letra:
-                via_principal_letra = match_letra.group(1)
-        
-        if len(numeros) >= 3:
-            numero_puerta = numeros[2]
+                via_principal_letra = match_letra.group(1).replace(' ', '')
     
     return {
         "numeros": numeros,
@@ -245,8 +312,7 @@ def buscar_candidatos(product_id_buscar):
         AND LOCALIDAD = ?
         AND PRODUCT_ID != ?
         AND ROUTE_ID IS NOT NULL
-        AND SESUCICL != 9000
-        AND SESUCICL != 4000
+
         """
         
         resultados = pd.read_sql_query(
@@ -266,7 +332,7 @@ def buscar_candidatos(product_id_buscar):
         
         if resultados.empty:
             return {
-                "error": "No se encontraron productos en la misma localidad con ROUTE_ID válido",
+                "error": "No se encontraron productos en la misma localidad con ciclo válido (SESUCICL diferente de 9000 y 4000)",
                 "encontrado": True,
                 "producto": producto_info,
                 "candidatos": []
