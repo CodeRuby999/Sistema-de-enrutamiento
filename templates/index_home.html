@@ -23,25 +23,25 @@
         }
 
         .container {
-            max-width: 720px;
+            max-width: 800px;
             width: 100%;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 35px;
+            margin-bottom: 50px;
             animation: fadeInDown 0.8s ease;
         }
 
         .header h1 {
             color: white;
-            font-size: 2.2rem;
+            font-size: 2.5rem;
             font-weight: 800;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
+            gap: 15px;
         }
 
         .header h1 i {
@@ -50,19 +50,19 @@
 
         .header p {
             color: #94a3b8;
-            font-size: 1rem;
+            font-size: 1.1rem;
         }
 
         .options-container {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 25px;
         }
 
         .option-card {
             background: #1e293b;
-            border-radius: 16px;
-            padding: 28px 32px;
+            border-radius: 20px;
+            padding: 40px;
             cursor: pointer;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             border: 2px solid transparent;
@@ -79,45 +79,36 @@
             animation-delay: 0.2s;
         }
 
-        .option-card:nth-child(3) {
-            animation-delay: 0.3s;
-        }
-
         .option-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-8px);
             border-color: #667eea;
-            box-shadow: 0 15px 45px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
         }
 
         .option-content {
             display: flex;
             align-items: center;
-            gap: 22px;
+            gap: 30px;
         }
 
         .option-icon {
-            width: 64px;
-            height: 64px;
+            width: 80px;
+            height: 80px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
+            border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 2.5rem;
             color: white;
             flex-shrink: 0;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
         }
 
         .option-card:nth-child(2) .option-icon {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
-        }
-
-        .option-card:nth-child(3) .option-icon {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
         }
 
         .option-text {
@@ -126,32 +117,32 @@
 
         .option-title {
             color: white;
-            font-size: 1.4rem;
+            font-size: 1.8rem;
             font-weight: 700;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         .option-description {
             color: #94a3b8;
-            font-size: 0.9rem;
+            font-size: 1rem;
             line-height: 1.5;
         }
 
         .option-arrow {
             color: #667eea;
-            font-size: 1.3rem;
+            font-size: 1.5rem;
             transition: transform 0.3s ease;
         }
 
         .option-card:hover .option-arrow {
-            transform: translateX(8px);
+            transform: translateX(10px);
         }
 
         .footer {
             text-align: center;
-            margin-top: 30px;
+            margin-top: 40px;
             color: #64748b;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             animation: fadeIn 1s ease 0.5s both;
         }
 
@@ -188,23 +179,23 @@
 
         @media (max-width: 768px) {
             .header h1 {
-                font-size: 1.8rem;
+                font-size: 2rem;
             }
 
             .option-content {
                 flex-direction: column;
                 text-align: center;
-                gap: 16px;
+                gap: 20px;
             }
 
             .option-icon {
-                width: 56px;
-                height: 56px;
-                font-size: 1.7rem;
+                width: 70px;
+                height: 70px;
+                font-size: 2rem;
             }
 
             .option-title {
-                font-size: 1.3rem;
+                font-size: 1.5rem;
             }
 
             .option-arrow {
@@ -212,7 +203,7 @@
             }
 
             .option-card {
-                padding: 24px;
+                padding: 30px;
             }
         }
     </style>
@@ -254,23 +245,6 @@
                         <div class="option-title">Buscar por Coordenadas</div>
                         <div class="option-description">
                             Geocodifica ubicaciones y encuentra productos en zonas específicas usando latitud y longitud
-                        </div>
-                    </div>
-                    <div class="option-arrow">
-                        <i class="fas fa-arrow-right"></i>
-                    </div>
-                </div>
-            </a>
-
-            <a href="/buscar-direccion" class="option-card">
-                <div class="option-content">
-                    <div class="option-icon">
-                        <i class="fas fa-map-signs"></i>
-                    </div>
-                    <div class="option-text">
-                        <div class="option-title">Buscar por Dirección</div>
-                        <div class="option-description">
-                            Construye una dirección paso a paso con autocompletado y encuentra productos en esa ubicación
                         </div>
                     </div>
                     <div class="option-arrow">

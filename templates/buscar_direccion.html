@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Búsqueda por Dirección - Enrutamiento</title>
+    <!-- Font Awesome para iconos profesionales -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(-5px);
+        }
+
+        .form-container {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-section {
+            margin-bottom: 35px;
+        }
+
+        .form-section h3 {
+            color: #f59e0b;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .form-group label .required {
+            color: #ef4444;
+        }
+
+        .form-group input,
+        .form-group select {
+            background: #0f172a;
+            border: 2px solid #334155;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #64748b;
+        }
+
+        .autocomplete-container {
+            position: relative;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .autocomplete-list.show {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid #334155;
+        }
+
+        .autocomplete-item:hover {
+            background: #1e293b;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .direction-preview {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .direction-preview h4 {
+            color: #f59e0b;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .direction-preview .address-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            min-height: 40px;
+            padding: 15px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 10px;
+        }
+
+        .direction-preview .address-text.empty {
+            color: #64748b;
+            font-style: italic;
+            font-size: 1.1rem;
+        }
+
+        .search-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border: none;
+            padding: 18px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(245, 158, 11, 0.4);
+        }
+
+        .search-btn:active {
+            transform: translateY(0);
+        }
+
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .loading.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #f59e0b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .results-card {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .results-card h3 {
+            color: #f59e0b;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .product-item {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .product-item:hover {
+            border-color: #f59e0b;
+            transform: translateX(5px);
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .product-id {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #f59e0b;
+        }
+
+        .product-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-label {
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .info-value {
+            color: white;
+            font-weight: 500;
+        }
+
+        .copy-btn {
+            background: #334155;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #475569;
+        }
+
+        .copy-btn.copied {
+            background: #10b981 !important;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
+            border: 2px solid #ef4444;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #fecaca;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .error-message i {
+            color: #ef4444;
+            margin-right: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .direction-preview .address-text {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Volver al inicio
+        </a>
+
+        <div class="header">
+            <h1>
+                <i class="fas fa-map-signs"></i>
+                Sistema de Enrutamiento - Búsqueda por Dirección
+            </h1>
+            <p>Construye una dirección paso a paso y encuentra productos</p>
+        </div>
+
+        <div class="form-container">
+            <form id="direccionForm" onsubmit="buscarPorDireccion(event)">
+                <!-- Vía Principal -->
+                <div class="form-section">
+                    <h3><i class="fas fa-road"></i> Vía Principal</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                Tipo de Vía <span class="required">*</span>
+                            </label>
+                            <select id="tipoVia1" onchange="actualizarVistaPrevia()">
+                                <option value="">Seleccionar...</option>
+                                <option value="CL">Calle (CL)</option>
+                                <option value="CR">Carrera (CR)</option>
+                                <option value="AV">Avenida (AV)</option>
+                                <option value="DG">Diagonal (DG)</option>
+                                <option value="TR">Transversal (TR)</option>
+                                <option value="KR">Kilómetro (KR)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                Número <span class="required">*</span>
+                            </label>
+                            <input type="text" id="numeroVia1" placeholder="Ej: 123" oninput="actualizarVistaPrevia()">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                Letra (opcional)
+                            </label>
+                            <input type="text" id="letraVia1" placeholder="Ej: A, B, BIS" maxlength="3" oninput="actualizarVistaPrevia()" style="text-transform: uppercase;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vía Secundaria (Intersección) -->
+                <div class="form-section">
+                    <h3><i class="fas fa-road"></i> Vía Secundaria (Intersección)</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                Tipo de Vía
+                            </label>
+                            <select id="tipoVia2" onchange="actualizarVistaPrevia()">
+                                <option value="">No aplica</option>
+                                <option value="CL">Calle (CL)</option>
+                                <option value="CR">Carrera (CR)</option>
+                                <option value="AV">Avenida (AV)</option>
+                                <option value="DG">Diagonal (DG)</option>
+                                <option value="TR">Transversal (TR)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                Número
+                            </label>
+                            <input type="text" id="numeroVia2" placeholder="Ej: 19" oninput="actualizarVistaPrevia()">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                Letra (opcional)
+                            </label>
+                            <input type="text" id="letraVia2" placeholder="Ej: A, B" maxlength="3" oninput="actualizarVistaPrevia()" style="text-transform: uppercase;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Número de Puerta -->
+                <div class="form-section">
+                    <h3><i class="fas fa-door-open"></i> Número de Puerta / Placa</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                Número de Puerta
+                            </label>
+                            <input type="text" id="numeroPuerta" placeholder="Ej: 11, 25, 105" oninput="actualizarVistaPrevia()">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                Complemento
+                            </label>
+                            <input type="text" id="complemento" placeholder="Ej: Apto 201, Local 3, Piso 2" oninput="actualizarVistaPrevia()">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                Paridad (opcional)
+                            </label>
+                            <select id="paridad">
+                                <option value="">Cualquiera</option>
+                                <option value="par">Par</option>
+                                <option value="impar">Impar</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ubicación Geográfica -->
+                <div class="form-section">
+                    <h3><i class="fas fa-map-marked-alt"></i> Ubicación Geográfica</h3>
+                    <div class="form-row">
+                        <div class="form-group autocomplete-container">
+                            <label>
+                                Municipio
+                            </label>
+                            <input type="text" id="municipio" placeholder="Ej: Bogotá" oninput="buscarMunicipio(this.value)" autocomplete="off">
+                            <div id="municipioList" class="autocomplete-list"></div>
+                        </div>
+                        <div class="form-group autocomplete-container">
+                            <label>
+                                Localidad
+                            </label>
+                            <input type="text" id="localidad" placeholder="Ej: Suba" oninput="buscarLocalidad(this.value)" autocomplete="off">
+                            <div id="localidadList" class="autocomplete-list"></div>
+                        </div>
+                        <div class="form-group autocomplete-container">
+                            <label>
+                                Corregimiento/Barrio
+                            </label>
+                            <input type="text" id="corregimiento" placeholder="Ej: Tibabuyes" oninput="buscarCorregimiento(this.value)" autocomplete="off">
+                            <div id="corregimientoList" class="autocomplete-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vista Previa -->
+                <div class="direction-preview">
+                    <h4><i class="fas fa-eye"></i> Vista Previa de la Dirección</h4>
+                    <div id="direccionPreview" class="address-text empty">
+                        Completa el formulario para ver la dirección construida
+                    </div>
+                </div>
+
+                <button type="submit" class="search-btn">
+                    <i class="fas fa-search"></i>
+                    Buscar Productos
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading" id="loading">
+            <div style="text-align: center;">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px; color: white; font-weight: 600;">Buscando productos...</p>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="errorMessage">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results" id="results">
+            <div class="results-card">
+                <h3><i class="fas fa-box-open"></i> Productos Encontrados (<span id="productCount">0</span>)</h3>
+                <div id="productosContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let municipios = [];
+        let localidades = [];
+        let corregimientos = [];
+
+        // Cargar datos iniciales
+        async function cargarDatosIniciales() {
+            try {
+                const response = await fetch('/api/obtener-ubicaciones');
+                const data = await response.json();
+                municipios = data.municipios || [];
+                localidades = data.localidades || [];
+                corregimientos = data.corregimientos || [];
+            } catch (error) {
+                console.error('Error al cargar datos iniciales:', error);
+            }
+        }
+
+        // Actualizar vista previa de la dirección
+        function actualizarVistaPrevia() {
+            const tipoVia1 = document.getElementById('tipoVia1').value;
+            const numeroVia1 = document.getElementById('numeroVia1').value;
+            const letraVia1 = document.getElementById('letraVia1').value;
+            const tipoVia2 = document.getElementById('tipoVia2').value;
+            const numeroVia2 = document.getElementById('numeroVia2').value;
+            const letraVia2 = document.getElementById('letraVia2').value;
+            const numeroPuerta = document.getElementById('numeroPuerta').value;
+            const complemento = document.getElementById('complemento').value;
+
+            let direccion = '';
+
+            // Via principal
+            if (tipoVia1) direccion += tipoVia1 + ' ';
+            if (numeroVia1) direccion += numeroVia1;
+            if (letraVia1) direccion += ' ' + letraVia1.toUpperCase();
+
+            // Via secundaria
+            if (tipoVia2 && numeroVia2) {
+                direccion += ' ' + tipoVia2 + ' ' + numeroVia2;
+                if (letraVia2) direccion += ' ' + letraVia2.toUpperCase();
+            }
+
+            // Número de puerta
+            if (numeroPuerta) {
+                direccion += ' - ' + numeroPuerta;
+            }
+
+            // Complemento
+            if (complemento) {
+                direccion += ' ' + complemento.toUpperCase();
+            }
+
+            const previewElement = document.getElementById('direccionPreview');
+            if (direccion.trim()) {
+                previewElement.textContent = direccion.trim();
+                previewElement.classList.remove('empty');
+            } else {
+                previewElement.textContent = 'Completa el formulario para ver la dirección construida';
+                previewElement.classList.add('empty');
+            }
+        }
+
+        // Autocompletado de municipio
+        function buscarMunicipio(query) {
+            const list = document.getElementById('municipioList');
+            if (!query) {
+                list.classList.remove('show');
+                return;
+            }
+
+            const filtered = municipios.filter(m => 
+                m.toLowerCase().includes(query.toLowerCase())
+            ).slice(0, 10);
+
+            if (filtered.length > 0) {
+                list.innerHTML = filtered.map(m => 
+                    `<div class="autocomplete-item" onclick="seleccionarMunicipio('${m}')">${m}</div>`
+                ).join('');
+                list.classList.add('show');
+            } else {
+                list.classList.remove('show');
+            }
+        }
+
+        function seleccionarMunicipio(municipio) {
+            document.getElementById('municipio').value = municipio;
+            document.getElementById('municipioList').classList.remove('show');
+        }
+
+        // Autocompletado de localidad
+        function buscarLocalidad(query) {
+            const list = document.getElementById('localidadList');
+            if (!query) {
+                list.classList.remove('show');
+                return;
+            }
+
+            const filtered = localidades.filter(l => 
+                l.toLowerCase().includes(query.toLowerCase())
+            ).slice(0, 10);
+
+            if (filtered.length > 0) {
+                list.innerHTML = filtered.map(l => 
+                    `<div class="autocomplete-item" onclick="seleccionarLocalidad('${l}')">${l}</div>`
+                ).join('');
+                list.classList.add('show');
+            } else {
+                list.classList.remove('show');
+            }
+        }
+
+        function seleccionarLocalidad(localidad) {
+            document.getElementById('localidad').value = localidad;
+            document.getElementById('localidadList').classList.remove('show');
+        }
+
+        // Autocompletado de corregimiento
+        function buscarCorregimiento(query) {
+            const list = document.getElementById('corregimientoList');
+            if (!query) {
+                list.classList.remove('show');
+                return;
+            }
+
+            const filtered = corregimientos.filter(c => 
+                c.toLowerCase().includes(query.toLowerCase())
+            ).slice(0, 10);
+
+            if (filtered.length > 0) {
+                list.innerHTML = filtered.map(c => 
+                    `<div class="autocomplete-item" onclick="seleccionarCorregimiento('${c}')">${c}</div>`
+                ).join('');
+                list.classList.add('show');
+            } else {
+                list.classList.remove('show');
+            }
+        }
+
+        function seleccionarCorregimiento(corregimiento) {
+            document.getElementById('corregimiento').value = corregimiento;
+            document.getElementById('corregimientoList').classList.remove('show');
+        }
+
+        // Cerrar listas de autocompletado al hacer clic fuera
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.querySelectorAll('.autocomplete-list').forEach(list => {
+                    list.classList.remove('show');
+                });
+            }
+        });
+
+        // Buscar productos por dirección
+        async function buscarPorDireccion(event) {
+            event.preventDefault();
+
+            const tipoVia1 = document.getElementById('tipoVia1').value;
+            const numeroVia1 = document.getElementById('numeroVia1').value;
+
+            if (!tipoVia1 || !numeroVia1) {
+                mostrarError('Por favor completa al menos el tipo de vía y número principal');
+                return;
+            }
+
+            const direccionData = {
+                tipoVia1: tipoVia1,
+                numeroVia1: numeroVia1,
+                letraVia1: document.getElementById('letraVia1').value,
+                tipoVia2: document.getElementById('tipoVia2').value,
+                numeroVia2: document.getElementById('numeroVia2').value,
+                letraVia2: document.getElementById('letraVia2').value,
+                numeroPuerta: document.getElementById('numeroPuerta').value,
+                complemento: document.getElementById('complemento').value,
+                paridad: document.getElementById('paridad').value,
+                municipio: document.getElementById('municipio').value,
+                localidad: document.getElementById('localidad').value,
+                corregimiento: document.getElementById('corregimiento').value
+            };
+
+            try {
+                document.getElementById('loading').classList.add('show');
+                document.getElementById('errorMessage').classList.remove('show');
+                document.getElementById('results').classList.remove('show');
+
+                const response = await fetch('/api/buscar-por-direccion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(direccionData)
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    mostrarError(data.error);
+                } else {
+                    mostrarResultados(data);
+                }
+            } catch (error) {
+                mostrarError('Error al buscar productos: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+
+        // Mostrar resultados
+        function mostrarResultados(data) {
+            const container = document.getElementById('productosContainer');
+            const countElement = document.getElementById('productCount');
+
+            countElement.textContent = data.productos.length;
+
+            if (data.productos.length === 0) {
+                container.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 40px;">No se encontraron productos para esta dirección</p>';
+            } else {
+                container.innerHTML = data.productos.map((producto, index) => `
+                    <div class="product-item">
+                        <div class="product-header">
+                            <div class="product-id">
+                                <i class="fas fa-box"></i> ${producto.PRODUCT_ID}
+                            </div>
+                        </div>
+                        <div class="product-info">
+                            <div class="info-item">
+                                <span class="info-label">Dirección:</span>
+                                <span class="info-value">${producto.DIRECCION}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Route ID:</span>
+                                <span class="info-value">${producto.ROUTE_ID}</span>
+                                <button class="copy-btn" onclick="copiarTexto('${producto.ROUTE_ID}', this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Itinerario:</span>
+                                <span class="info-value">${producto.ITINERARIO}</span>
+                                <button class="copy-btn" onclick="copiarTexto('${producto.ITINERARIO}', this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Secuencia:</span>
+                                <span class="info-value">${producto.SECUENCIA}</span>
+                                <button class="copy-btn" onclick="copiarTexto('${producto.SECUENCIA}', this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('results').classList.add('show');
+        }
+
+        // Mostrar error
+        function mostrarError(mensaje) {
+            document.getElementById('errorText').textContent = mensaje;
+            document.getElementById('errorMessage').classList.add('show');
+            setTimeout(() => {
+                document.getElementById('errorMessage').classList.remove('show');
+            }, 5000);
+        }
+
+        // Copiar texto al portapapeles
+        function copiarTexto(texto, btn) {
+            navigator.clipboard.writeText(texto).then(() => {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Error al copiar:', err);
+            });
+        }
+
+        // Cargar datos al inicio
+        cargarDatosIniciales();
+    </script>
+</body>
+</html>
+

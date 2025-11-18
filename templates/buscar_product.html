@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Búsqueda de Candidatos - Enrutamiento</title>
+    <!-- Font Awesome para iconos profesionales -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet para mapas interactivos -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            padding: 20px;
+            transition: background 0.3s ease;
+        }
+
+        /* Modo oscuro */
+        body.dark-mode {
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+        }
+
+        body.dark-mode .search-card,
+        body.dark-mode .producto-card,
+        body.dark-mode .candidatos-section {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode label,
+        body.dark-mode .info-label,
+        body.dark-mode .candidato-info-label {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .info-value,
+        body.dark-mode .info-item {
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .candidato-card {
+            background: #0f172a;
+            border-left-color: #3b82f6;
+        }
+
+        body.dark-mode .candidato-direccion {
+            background: rgba(59, 130, 246, 0.1);
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .candidato-direccion strong {
+            color: #3b82f6;
+        }
+
+        body.dark-mode .candidato-info-item {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        body.dark-mode .candidato-info-label {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .candidato-info-value {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode input[type="number"] {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-color: #3b82f6;
+        }
+
+        body.dark-mode .candidato-numero,
+        body.dark-mode .producto-card h2,
+        body.dark-mode .candidatos-section h2 {
+            color: #3b82f6;
+        }
+
+        body.dark-mode .candidatos-section h2:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        body.dark-mode .toggle-icon {
+            color: #3b82f6;
+        }
+
+        /* Modo oscuro para itinerarios */
+        body.dark-mode .itinerarios-section {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .itinerarios-section h2 {
+            color: #3b82f6;
+        }
+
+        body.dark-mode .itinerario-item {
+            background: #0f172a;
+            border-left-color: #3b82f6;
+        }
+
+        body.dark-mode .itinerario-item:hover {
+            background: #1e293b;
+        }
+
+        body.dark-mode .itinerario-numero {
+            color: #3b82f6;
+        }
+
+        body.dark-mode .itinerario-count {
+            background: #3b82f6;
+            color: #0f172a;
+        }
+
+        body.dark-mode .btn-ver-itinerario {
+            background: #3b82f6;
+            color: #f8fafc;
+        }
+
+        body.dark-mode .btn-ver-itinerario:hover {
+            background: #2563eb;
+        }
+
+        body.dark-mode .itinerarios-content div[style*="color: #666"] {
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .itinerarios-section h2:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* Modo oscuro para recomendación */
+        body.dark-mode .recomendacion-card {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .recomendacion-card h2 {
+            color: #3b82f6;
+        }
+
+        body.dark-mode .recomendacion-info {
+            background: #0f172a;
+            border-left-color: #3b82f6;
+        }
+
+        body.dark-mode .recomendacion-label {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .recomendacion-value {
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .copy-btn {
+            background: #3b82f6;
+            color: #f8fafc;
+        }
+
+        body.dark-mode .copy-btn:hover {
+            background: #2563eb;
+        }
+
+        body.dark-mode .recomendacion-card h2:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .search-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .btn-search {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-search:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-search:active {
+            transform: translateY(0);
+        }
+
+        .btn-search:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee;
+            border-left: 4px solid #f44;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .producto-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .producto-card h2 {
+            color: #1e40af;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 1rem;
+        }
+
+        .candidatos-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .candidatos-section h2 {
+            color: #1e40af;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.3s ease;
+            padding: 10px;
+            margin: -10px -10px 20px -10px;
+            border-radius: 8px;
+        }
+
+        .candidatos-section h2:hover {
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .candidatos-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+            color: #3b82f6;
+            font-size: 1.2rem;
+        }
+
+        .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .candidatos-content {
+            max-height: 5000px;
+            overflow: hidden;
+            transition: max-height 0.5s ease, opacity 0.3s ease;
+            opacity: 1;
+        }
+
+        .candidatos-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .candidato-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3b82f6;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .candidato-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        }
+
+        .candidato-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .candidato-numero {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1e40af;
+        }
+
+        .candidato-tipo {
+            background: #3b82f6;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .candidato-tipo.anterior {
+            background: #f59e0b;
+        }
+
+        .candidato-tipo.posterior {
+            background: #10b981;
+        }
+
+        .candidato-direccion {
+            background: rgba(59, 130, 246, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .candidato-direccion strong {
+            color: #1e40af;
+            margin-right: 8px;
+        }
+
+        .candidato-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .candidato-info-item {
+            background: rgba(0, 0, 0, 0.02);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .candidato-info-label {
+            font-weight: 600;
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .candidato-info-value {
+            color: #333;
+            font-weight: 500;
+            flex: 1;
+            text-align: right;
+            margin-right: 8px;
+        }
+
+        .candidato-copy-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 8px;
+            transition: all 0.2s;
+        }
+
+        .candidato-copy-btn:hover {
+            background: #2563eb;
+            transform: scale(1.05);
+        }
+
+        .candidato-copy-btn.copied {
+            background: #10b981 !important;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+        }
+        
+        .candidato-copy-btn.copied:hover {
+            background: #10b981 !important;
+            transform: none;
+        }
+
+        .recomendacion-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .recomendacion-card h2 {
+            color: #1e40af;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recomendacion-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recomendacion-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .recomendacion-item {
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        .recomendacion-label {
+            font-weight: 600;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .recomendacion-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        .copy-btn {
+            background: #3b82f6;
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .copy-btn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .copy-btn.copied {
+            background: #10b981 !important;
+            box-shadow: 0 3px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .copy-btn.copied:hover {
+            background: #10b981 !important;
+            transform: none;
+        }
+
+        .recomendacion-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* Estilos para sección de itinerarios */
+        .itinerarios-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .itinerarios-section h2 {
+            color: #1e40af;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .itinerarios-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .itinerarios-content {
+            background: transparent;
+            border-radius: 10px;
+            padding: 0;
+        }
+
+        .itinerario-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .itinerario-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        }
+
+        .itinerario-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .itinerario-numero {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1e40af;
+        }
+
+        .itinerario-count {
+            background: #3b82f6;
+            color: white;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .btn-ver-itinerario {
+            background: #3b82f6;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-ver-itinerario:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
+        }
+
+        /* Estilos para el modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-container {
+            background: white;
+            border-radius: 15px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 85vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.dark-mode .modal-container {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(255,255,255,0.4);
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 25px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .candidato-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .candidato-info {
+                grid-template-columns: 1fr;
+            }
+
+            .candidato-info-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .candidato-info-value {
+                text-align: left;
+                margin-right: 0;
+            }
+
+            .itinerario-item {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+
+            .itinerario-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .btn-ver-itinerario {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .modal-container {
+                max-width: 95%;
+                max-height: 90vh;
+            }
+
+            .modal-header h2 {
+                font-size: 1.2rem;
+            }
+
+            .modal-body {
+                padding: 15px;
+            }
+        }
+
+        /* Estilos para marcadores personalizados en el mapa */
+        .custom-marker {
+            background: transparent;
+            border: none;
+        }
+
+        .custom-marker div {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .custom-marker div:hover {
+            transform: scale(1.2);
+        }
+
+        /* Estilos para popups de Leaflet */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .leaflet-popup-content {
+            margin: 12px;
+            line-height: 1.6;
+        }
+
+        /* Estilos para selector de tipo de búsqueda */
+        .search-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .selector-title {
+            color: #333;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .search-option-btn {
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-option-btn:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .search-option-btn.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .search-option-btn i {
+            font-size: 2rem;
+            color: #667eea;
+        }
+
+        .search-option-btn span {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        .search-option-btn p {
+            font-size: 0.85rem;
+            color: #666;
+            margin: 0;
+            text-align: center;
+        }
+
+        .search-form-container {
+            display: none;
+        }
+
+        .search-form-container.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-box"></i> Sistema de Enrutamiento</h1>
+            <p>Buscar por id del producto</p>
+            <a href="/" style="display: inline-block; margin-top: 15px; color: #667eea; text-decoration: none; font-size: 0.95rem; transition: color 0.3s;">
+                <i class="fas fa-arrow-left"></i> Volver al inicio
+            </a>
+        </div>
+
+        <!-- Formulario de búsqueda por Product_ID -->
+        <div class="search-card">
+            <h3 style="color: #667eea; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-search"></i> Encontrar producto
+            </h3>
+            <div class="form-group">
+                <input type="number" id="productId" placeholder="Ingrese el PRODUCT_ID" required>
+            </div>
+            <button class="btn-search" onclick="buscarCandidatos()">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px; color: white; font-weight: 600;">Buscando...</p>
+        </div>
+
+        <!-- Resultados de búsqueda por Product_ID -->
+        <div class="results" id="results-product">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 10px 10px 0 0; margin-bottom: 0;">
+                <h3 style="color: white; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-box"></i> Resultados - Búsqueda por Product_ID
+                </h3>
+            </div>
+            
+            <!-- Producto encontrado -->
+            <div class="producto-card">
+                <h2><i class="fas fa-check-circle"></i> Producto Encontrado</h2>
+                <div class="info-grid" id="productoInfo"></div>
+            </div>
+
+            <!-- Mensaje de error (si no hay candidatos) -->
+            <div class="error-message" id="errorMessage"></div>
+
+            <!-- Candidatos -->
+            <div class="candidatos-section" id="candidatosSection">
+                <h2 onclick="toggleCandidatos()">
+                    <span class="candidatos-header-title">
+                        <i class="fas fa-users"></i> Vecinos y Candidatos Cercanos
+                    </span>
+                    <i class="fas fa-chevron-down toggle-icon collapsed" id="toggleIcon"></i>
+                </h2>
+                <div class="candidatos-content collapsed" id="candidatosContent">
+                    <div id="candidatosList"></div>
+                </div>
+            </div>
+
+            <!-- Análisis de Itinerarios (después de candidatos) -->
+            <div class="itinerarios-section" id="itinerariosSection" style="display: none;">
+            </div>
+
+            <!-- Recomendación -->
+            <div class="recomendacion-card" id="recomendacionCard">
+                <h2>
+                    <i class="fas fa-star"></i> Recomendación
+                </h2>
+                <div class="recomendacion-info" id="recomendacionInfo"></div>
+            </div>
+        </div>
+
+
+        <!-- Modal para mostrar candidatos por itinerario -->
+        <div class="modal-overlay" id="modalOverlay" onclick="cerrarModal()">
+            <div class="modal-container" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2 id="modalTitle"><i class="fas fa-route"></i> Candidatos del Itinerario</h2>
+                    <button class="modal-close" onclick="cerrarModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variable global para almacenar candidatos
+        let candidatosGlobales = [];
+
+        // ========== BÚSQUEDA DE CANDIDATOS ==========
+        async function buscarCandidatos() {
+            const productId = document.getElementById('productId').value;
+            
+            if (!productId) {
+                mostrarError('Por favor ingrese un PRODUCT_ID');
+                return;
+            }
+
+            // Ocultar sección de resultados
+            document.getElementById('results-product').classList.remove('show');
+            document.getElementById('errorMessage').classList.remove('show');
+            
+            // Mostrar loading
+            document.getElementById('loading').style.display = 'block';
+            document.querySelector('.btn-search').disabled = true;
+
+            try {
+                const response = await fetch('/buscar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ product_id: productId })
+                });
+
+                const data = await response.json();
+
+                // Ocultar loading
+                document.getElementById('loading').style.display = 'none';
+                document.querySelector('.btn-search').disabled = false;
+
+                if (!data.encontrado) {
+                    mostrarError(data.error || 'No se encontraron resultados');
+                    return;
+                }
+
+                // Si se encontró el producto pero hay un error (sin candidatos), mostrar producto y error
+                if (data.error && data.producto) {
+                    mostrarResultados(data);
+                    mostrarError(data.error);
+                } else {
+                    mostrarResultados(data);
+                }
+
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.querySelector('.btn-search').disabled = false;
+                mostrarError('Error al conectar con el servidor: ' + error.message);
+            }
+        }
+
+        function mostrarError(mensaje) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + mensaje;
+            errorDiv.classList.add('show');
+        }
+
+        // ========== BÚSQUEDA POR COORDENADAS ==========
+        async function buscarPorCoordenadas() {
+            const latitud = parseFloat(document.getElementById('latitud').value);
+            const longitud = parseFloat(document.getElementById('longitud').value);
+            
+            if (!latitud || !longitud) {
+                alert('Por favor ingrese latitud y longitud válidas');
+                return;
+            }
+
+            // Ocultar todas las secciones de resultados
+            document.getElementById('results-product').classList.remove('show');
+            document.getElementById('results-coordenadas').classList.remove('show');
+            document.getElementById('errorMessageCoord').classList.remove('show');
+            
+            // Mostrar loading
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch('/geocodificar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        latitud: latitud,
+                        longitud: longitud 
+                    })
+                });
+
+                const data = await response.json();
+                
+                // Ocultar loading
+                document.getElementById('loading').style.display = 'none';
+
+                if (data.error) {
+                    mostrarError(data.error);
+                    return;
+                }
+
+                // Mostrar resultados de geocodificación
+                mostrarResultadosGeocodificacion(data);
+
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                mostrarError('Error al geocodificar: ' + error.message);
+            }
+        }
+
+        function mostrarResultadosGeocodificacion(data) {
+            document.getElementById('results-coordenadas').classList.add('show');
+            
+            // Mostrar información de la dirección encontrada
+            const direccionInfo = document.getElementById('direccionInfo');
+            direccionInfo.innerHTML = `
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label"><i class="fas fa-map-marked-alt"></i> Dirección Encontrada</div>
+                    <div class="info-value" style="font-size: 1.1rem; color: #10b981;">${data.direccion.display_name || data.direccion.direccion_completa}</div>
+                </div>
+                ${data.direccion.calle ? `
+                <div class="info-item">
+                    <div class="info-label">Calle</div>
+                    <div class="info-value">${data.direccion.calle}</div>
+                </div>
+                ` : ''}
+                ${data.direccion.barrio ? `
+                <div class="info-item">
+                    <div class="info-label">Barrio</div>
+                    <div class="info-value">${data.direccion.barrio}</div>
+                </div>
+                ` : ''}
+                ${data.direccion.ciudad ? `
+                <div class="info-item">
+                    <div class="info-label">Ciudad</div>
+                    <div class="info-value">${data.direccion.ciudad}</div>
+                </div>
+                ` : ''}
+                ${data.direccion.departamento ? `
+                <div class="info-item">
+                    <div class="info-label">Departamento</div>
+                    <div class="info-value">${data.direccion.departamento}</div>
+                </div>
+                ` : ''}
+                <div class="info-item">
+                    <div class="info-label">Latitud</div>
+                    <div class="info-value">${data.direccion.coordenadas.latitud}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Longitud</div>
+                    <div class="info-value">${data.direccion.coordenadas.longitud}</div>
+                </div>
+            `;
+
+            // Mostrar productos cercanos si hay
+            if (data.productos_cercanos && data.productos_cercanos.length > 0) {
+                const productosZonaList = document.getElementById('productosZonaList');
+                productosZonaList.innerHTML = `
+                    <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+                        <strong><i class="fas fa-check-circle"></i> ${data.total_productos} producto(s) encontrado(s) en esta zona</strong>
+                    </div>
+                    ${data.productos_cercanos.map((producto, index) => `
+                        <div class="candidato-card" style="margin-bottom: 20px;">
+                            <div class="candidato-header">
+                                <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${producto.PRODUCT_ID}</span>
+                            </div>
+                            
+                            <div class="candidato-direccion">
+                                <strong><i class="fas fa-map-marker-alt"></i> Dirección:</strong> ${producto.DIRECCION}
+                            </div>
+                            
+                            <div class="candidato-info">
+                                ${producto.ROUTE_ID ? `
+                                <div class="candidato-info-item">
+                                    <span class="candidato-info-label">ROUTE_ID:</span>
+                                    <span class="candidato-info-value">${producto.ROUTE_ID}</span>
+                                </div>
+                                ` : ''}
+                                <div class="candidato-info-item">
+                                    <span class="candidato-info-label">Municipio:</span>
+                                    <span class="candidato-info-value">${producto.MUNICIPIO || 'N/A'}</span>
+                                </div>
+                                <div class="candidato-info-item">
+                                    <span class="candidato-info-label">Localidad:</span>
+                                    <span class="candidato-info-value">${producto.LOCALIDAD || 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+                document.getElementById('productosZonaSection').style.display = 'block';
+            } else {
+                const productosZonaList = document.getElementById('productosZonaList');
+                productosZonaList.innerHTML = `
+                    <div style="background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; padding: 15px; border-radius: 8px;">
+                        <i class="fas fa-info-circle"></i> ${data.mensaje}
+                    </div>
+                `;
+                document.getElementById('productosZonaSection').style.display = 'block';
+            }
+        }
+
+        function mostrarResultados(data) {
+            // Mostrar la sección de resultados primero
+            document.getElementById('results-product').classList.add('show');
+            
+            // Mostrar información del producto
+            const productoInfo = document.getElementById('productoInfo');
+            productoInfo.innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">PRODUCT_ID</div>
+                    <div class="info-value">${data.producto.PRODUCT_ID || 'N/A'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">DPTO</div>
+                    <div class="info-value">${data.producto.DPTO}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">MUNICIPIO</div>
+                    <div class="info-value">${data.producto.MUNICIPIO}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">LOCALIDAD</div>
+                    <div class="info-value">${data.producto.LOCALIDAD}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">DIRECCIÓN</div>
+                    <div class="info-value">${data.producto.DIRECCION}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">ROUTE_ID Actual</div>
+                    <div class="info-value">${data.producto.ROUTE_ID || 'None'}</div>
+                </div>
+            `;
+
+            // Guardar candidatos globalmente
+            candidatosGlobales = data.candidatos || [];
+
+            // Mostrar candidatos
+            if (data.candidatos && data.candidatos.length > 0) {
+                const candidatosList = document.getElementById('candidatosList');
+                candidatosList.innerHTML = data.candidatos.map((candidato, index) => `
+                    <div class="candidato-card">
+                        <div class="candidato-header">
+                            <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${candidato.PRODUCT_ID}</span>
+                            ${candidato.tipo_candidato ? `<span class="candidato-tipo ${candidato.tipo_candidato.includes('anterior') ? 'anterior' : 'posterior'}">${candidato.tipo_candidato}</span>` : ''}
+                        </div>
+                        
+                        <div class="candidato-direccion">
+                            <strong><i class="fas fa-map-marker-alt"></i> Dirección:</strong> ${candidato.DIRECCION}
+                        </div>
+                        
+                        <div class="candidato-info">
+                            <div class="candidato-info-item">
+                                <span class="candidato-info-label">ROUTE_ID:</span>
+                                <span class="candidato-info-value">${candidato.ROUTE_ID}</span>
+                                <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.ROUTE_ID}', this)"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div class="candidato-info-item">
+                                <span class="candidato-info-label">ITINERARIO:</span>
+                                <span class="candidato-info-value">${candidato.ITINERARIO}</span>
+                                <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.ITINERARIO}', this)"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div class="candidato-info-item">
+                                <span class="candidato-info-label">SECUENCIA:</span>
+                                <span class="candidato-info-value">${candidato.SECUENCIA}</span>
+                                <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.SECUENCIA}', this)"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div class="candidato-info-item">
+                                <span class="candidato-info-label">Ciclo:</span>
+                                <span class="candidato-info-value">${candidato.CICLO}</span>
+                                <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.CICLO}', this)"><i class="fas fa-copy"></i></button>
+                            </div>
+                            ${candidato.diferencia_puerta !== null ? `
+                            <div class="candidato-info-item" style="grid-column: 1 / -1; background: rgba(102, 126, 234, 0.1);">
+                                <span class="candidato-info-label"><i class="fas fa-ruler-horizontal"></i> Diferencia puerta:</span>
+                                <span class="candidato-info-value" style="color: #667eea; font-weight: 700;">${candidato.diferencia_puerta} ${candidato.diferencia_puerta === 1 ? 'metro' : 'metros'}</span>
+                            </div>
+                            ` : ''}
+                            ${candidato.diferencia_complemento !== null && candidato.diferencia_complemento !== undefined ? `
+                            <div class="candidato-info-item" style="grid-column: 1 / -1; background: rgba(52, 211, 153, 0.1);">
+                                <span class="candidato-info-label"><i class="fas fa-layer-group"></i> Diferencia complemento:</span>
+                                <span class="candidato-info-value" style="color: #10b981; font-weight: 700;">${candidato.diferencia_complemento} ${candidato.diferencia_complemento === 1 ? 'unidad' : 'unidades'} (apto/local/piso)</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+                // Mostrar mensajes informativos sobre vecinos no encontrados
+                if (data.vecinos_info && data.vecinos_info.mensajes && data.vecinos_info.mensajes.length > 0) {
+                    const mensajesHtml = data.vecinos_info.mensajes.map(msg => 
+                        `<div style="background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; padding: 10px; margin-top: 15px; border-radius: 5px;">
+                            <i class="fas fa-info-circle" style="color: #ffc107; margin-right: 8px;"></i>
+                            <span style="color: #856404;">${msg}</span>
+                        </div>`
+                    ).join('');
+                    candidatosList.innerHTML += mensajesHtml;
+                }
+
+                document.getElementById('candidatosSection').style.display = 'block';
+            } else {
+                document.getElementById('candidatosSection').style.display = 'none';
+            }
+
+            // Mostrar análisis de itinerarios (FUERA del collapsable)
+            if (data.itinerarios_info && data.itinerarios_info.total_unicos > 0) {
+                const itinerariosSection = document.getElementById('itinerariosSection');
+                itinerariosSection.innerHTML = `
+                    <h2>
+                        <i class="fas fa-chart-bar"></i> Análisis de Itinerarios
+                    </h2>
+                    <div class="itinerarios-content" id="itinerariosContent">
+                        <div style="margin-bottom: 15px; font-size: 1rem; color: #666;">
+                            <strong>Total de itinerarios únicos:</strong> ${data.itinerarios_info.total_unicos}
+                        </div>
+                        ${data.itinerarios_info.detalle.map(item => `
+                            <div class="itinerario-item">
+                                <div class="itinerario-info">
+                                    <span class="itinerario-numero">
+                                        <i class="fas fa-route"></i> ${item.itinerario}
+                                    </span>
+                                    <span class="itinerario-count">
+                                        cant: ${item.cantidad}
+                                    </span>
+                                </div>
+                                <button class="btn-ver-itinerario" onclick="verCandidatosItinerario(${item.itinerario})">
+                                    <i class="fas fa-eye"></i> Ver Vecinos
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                itinerariosSection.style.display = 'block';
+            } else {
+                document.getElementById('itinerariosSection').style.display = 'none';
+            }
+
+            // Mostrar recomendación
+            if (data.recomendacion) {
+                const recomendacionInfo = document.getElementById('recomendacionInfo');
+                recomendacionInfo.innerHTML = `
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-label">Dirección:</div>
+                        <div class="recomendacion-value">${data.recomendacion.DIRECCION}</div>
+                    </div>
+                    ${data.recomendacion.diferencia_puerta !== null ? `
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-label">Distancia:</div>
+                        <div class="recomendacion-value">${data.recomendacion.diferencia_puerta} ${data.recomendacion.diferencia_puerta === 1 ? 'metro' : 'metros'} de la dirección buscada</div>
+                    </div>
+                    ` : ''}
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-row">
+                            <div>
+                                <div class="recomendacion-label">ROUTE_ID:</div>
+                                <div class="recomendacion-value">${data.recomendacion.ROUTE_ID}</div>
+                            </div>
+                            <button class="copy-btn" onclick="copiarTexto('${data.recomendacion.ROUTE_ID}', this)">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-row">
+                            <div>
+                                <div class="recomendacion-label">ITINERARIO:</div>
+                                <div class="recomendacion-value">${data.recomendacion.ITINERARIO}</div>
+                            </div>
+                            <button class="copy-btn" onclick="copiarTexto('${data.recomendacion.ITINERARIO}', this)">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-row">
+                            <div>
+                                <div class="recomendacion-label">SECUENCIA (vecino):</div>
+                                <div class="recomendacion-value">${data.recomendacion.SECUENCIA}</div>
+                            </div>
+                            <button class="copy-btn" onclick="copiarTexto('${data.recomendacion.SECUENCIA}', this)">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    ${data.recomendacion.SECUENCIA_SUGERIDA !== null && data.recomendacion.SECUENCIA_SUGERIDA !== undefined ? `
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-row">
+                            <div>
+                                <div class="recomendacion-label">SECUENCIA SUGERIDA (producto):</div>
+                                <div class="recomendacion-value" style="font-weight: 700; color: #10b981;">
+                                    ${data.recomendacion.SECUENCIA_SUGERIDA}
+                                    <i class="fas fa-arrow-right" style="margin: 0 8px;"></i>
+                                    <span style="font-size: 0.85em; color: #666;">(para enrutar el producto)</span>
+                                </div>
+                            </div>
+                            <button class="copy-btn" onclick="copiarTexto('${data.recomendacion.SECUENCIA_SUGERIDA}', this)">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    ` : ''}
+                    <div class="recomendacion-item">
+                        <div class="recomendacion-row">
+                            <div>
+                                <div class="recomendacion-label">Ciclo:</div>
+                                <div class="recomendacion-value">${data.recomendacion.CICLO}</div>
+                            </div>
+                            <button class="copy-btn" onclick="copiarTexto('${data.recomendacion.CICLO}', this)">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('recomendacionCard').style.display = 'block';
+            } else {
+                document.getElementById('recomendacionCard').style.display = 'none';
+            }
+
+            // ========== MOSTRAR PUNTOS EN EL MAPA ==========
+            mostrarPuntosEnMapa(data);
+        }
+
+        // ========== FUNCIÓN PARA MOSTRAR PUNTOS EN EL MAPA ==========
+        function mostrarPuntosEnMapa(data) {
+            // Limpiar marcadores anteriores
+            if (window.mapMarkers) {
+                window.mapMarkers.forEach(m => map.removeLayer(m));
+            }
+            window.mapMarkers = [];
+            
+            let marcadoresValidos = 0;
+            
+            // Marcador del producto buscado (ROJO - punto principal)
+            if (data.producto && data.producto.latitud && data.producto.longitud) {
+                const productoIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="
+                        background: #ef4444; 
+                        width: 24px; 
+                        height: 24px; 
+                        border-radius: 50%; 
+                        border: 3px solid white; 
+                        box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    ">
+                        <i class="fas fa-home" style="color: white; font-size: 10px;"></i>
+                    </div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+                
+                const productoMarker = L.marker(
+                    [data.producto.latitud, data.producto.longitud],
+                    { icon: productoIcon }
+                ).addTo(map);
+                
+                productoMarker.bindPopup(`
+                    <div style="font-family: Arial, sans-serif;">
+                        <strong style="color: #ef4444; font-size: 14px;">
+                            🎯 Producto Buscado
+                        </strong><br>
+                        <strong>ID:</strong> ${data.producto.PRODUCT_ID}<br>
+                        <strong>Dir:</strong> ${data.producto.DIRECCION}<br>
+                        <strong>Municipio:</strong> ${data.producto.MUNICIPIO || 'N/A'}
+                    </div>
+                `);
+                
+                window.mapMarkers.push(productoMarker);
+                marcadoresValidos++;
+            }
+            
+            // Marcadores de candidatos/vecinos (colores según tipo)
+            if (data.candidatos && data.candidatos.length > 0) {
+                data.candidatos.forEach((candidato, index) => {
+                    if (candidato.latitud && candidato.longitud) {
+                        // Definir color según tipo de candidato
+                        let color = '#3b82f6'; // Azul por defecto
+                        let icono = 'fa-map-marker-alt';
+                        
+                        if (candidato.tipo_candidato) {
+                            if (candidato.tipo_candidato.includes('anterior')) {
+                                color = '#f59e0b'; // Naranja para anterior
+                                icono = 'fa-arrow-left';
+                            } else if (candidato.tipo_candidato.includes('posterior')) {
+                                color = '#8b5cf6'; // Morado para posterior
+                                icono = 'fa-arrow-right';
+                            } else if (candidato.tipo_candidato.includes('Mismo edificio')) {
+                                color = '#10b981'; // Verde para mismo edificio
+                                icono = 'fa-building';
+                            }
+                        }
+                        
+                        const candidatoIcon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style="
+                                background: ${color}; 
+                                width: 18px; 
+                                height: 18px; 
+                                border-radius: 50%; 
+                                border: 2px solid white; 
+                                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-size: 8px;
+                                color: white;
+                                font-weight: bold;
+                            ">${index + 1}</div>`,
+                            iconSize: [18, 18],
+                            iconAnchor: [9, 9]
+                        });
+                        
+                        const candidatoMarker = L.marker(
+                            [candidato.latitud, candidato.longitud],
+                            { icon: candidatoIcon }
+                        ).addTo(map);
+                        
+                        candidatoMarker.bindPopup(`
+                            <div style="font-family: Arial, sans-serif;">
+                                <strong style="color: ${color}; font-size: 13px;">
+                                    📍 Vecino #${index + 1}
+                                </strong><br>
+                                <strong>ID:</strong> ${candidato.PRODUCT_ID}<br>
+                                <strong>Dir:</strong> ${candidato.DIRECCION}<br>
+                                ${candidato.tipo_candidato ? `<strong>Tipo:</strong> ${candidato.tipo_candidato}<br>` : ''}
+                                ${candidato.diferencia_puerta !== null ? `<strong>Dist:</strong> ${candidato.diferencia_puerta} metros<br>` : ''}
+                                <strong>Itinerario:</strong> ${candidato.ITINERARIO || 'N/A'}
+                            </div>
+                        `);
+                        
+                        window.mapMarkers.push(candidatoMarker);
+                        marcadoresValidos++;
+                    }
+                });
+            }
+            
+            // Ajustar vista del mapa para mostrar todos los puntos
+            if (marcadoresValidos > 0) {
+                const group = L.featureGroup(window.mapMarkers);
+                map.fitBounds(group.getBounds().pad(0.15));
+                
+                // Mensaje indicando que hay puntos en el mapa
+                console.log(`✓ ${marcadoresValidos} punto(s) mostrado(s) en el mapa`);
+            } else {
+                console.log('✗ No se pudieron geocodificar las direcciones para mostrar en el mapa');
+            }
+        }
+
+        // Función para copiar texto al portapapeles
+        async function copiarTexto(texto, boton) {
+            try {
+                await navigator.clipboard.writeText(texto);
+                
+                // Cambiar el icono del botón temporalmente
+                const iconoOriginal = boton.innerHTML;
+                const esBotonPequeno = boton.classList.contains('candidato-copy-btn');
+                
+                if (esBotonPequeno) {
+                    boton.innerHTML = '<i class="fas fa-check"></i>';
+                } else {
+                    boton.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                }
+                
+                boton.classList.add('copied');
+                
+                // Restaurar después de 2 segundos
+                setTimeout(() => {
+                    boton.innerHTML = iconoOriginal;
+                    boton.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                // Fallback para navegadores antiguos
+                const textArea = document.createElement('textarea');
+                textArea.value = texto;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    const esBotonPequeno = boton.classList.contains('candidato-copy-btn');
+                    
+                    if (esBotonPequeno) {
+                        boton.innerHTML = '<i class="fas fa-check"></i>';
+                    } else {
+                        boton.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                    }
+                    
+                    boton.classList.add('copied');
+                    
+                    setTimeout(() => {
+                        boton.innerHTML = esBotonPequeno ? '<i class="fas fa-copy"></i>' : '<i class="fas fa-copy"></i> Copiar';
+                        boton.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    alert('Error al copiar: ' + err);
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
+        }
+
+        // Permitir buscar con Enter
+        document.getElementById('productId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                buscarCandidatos();
+            }
+        });
+
+        // Función para hacer toggle del contenido de candidatos
+        function toggleCandidatos() {
+            const content = document.getElementById('candidatosContent');
+            const icon = document.getElementById('toggleIcon');
+            
+            content.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+        }
+
+        // Función para hacer toggle del contenido de productos en zona (coordenadas)
+        function toggleProductosZona() {
+            const content = document.getElementById('productosZonaContent');
+            const icon = document.getElementById('toggleIconCoord');
+            
+            content.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+        }
+
+        // Función para ver vecinos de un itinerario específico
+        function verCandidatosItinerario(itinerario) {
+            const candidatosFiltrados = candidatosGlobales.filter(c => c.ITINERARIO === itinerario);
+            
+            if (candidatosFiltrados.length === 0) {
+                alert('No se encontraron candidatos para este itinerario');
+                return;
+            }
+
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalTitle.innerHTML = `<i class="fas fa-route"></i> Itinerario ${itinerario} - ${candidatosFiltrados.length} ${candidatosFiltrados.length === 1 ? 'Candidato' : 'Candidatos'}`;
+            
+            modalBody.innerHTML = candidatosFiltrados.map((candidato, index) => `
+                <div class="candidato-card" style="margin-bottom: 20px;">
+                    <div class="candidato-header">
+                        <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${candidato.PRODUCT_ID}</span>
+                        ${candidato.tipo_candidato ? `<span class="candidato-tipo ${candidato.tipo_candidato.includes('anterior') ? 'anterior' : 'posterior'}">${candidato.tipo_candidato}</span>` : ''}
+                    </div>
+                    
+                    <div class="candidato-direccion">
+                        <strong><i class="fas fa-map-marker-alt"></i> Dirección:</strong> ${candidato.DIRECCION}
+                    </div>
+                    
+                    <div class="candidato-info">
+                        <div class="candidato-info-item">
+                            <span class="candidato-info-label">ROUTE_ID:</span>
+                            <span class="candidato-info-value">${candidato.ROUTE_ID}</span>
+                            <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.ROUTE_ID}', this)"><i class="fas fa-copy"></i></button>
+                        </div>
+                        <div class="candidato-info-item">
+                            <span class="candidato-info-label">ITINERARIO:</span>
+                            <span class="candidato-info-value">${candidato.ITINERARIO}</span>
+                            <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.ITINERARIO}', this)"><i class="fas fa-copy"></i></button>
+                        </div>
+                        <div class="candidato-info-item">
+                            <span class="candidato-info-label">SECUENCIA:</span>
+                            <span class="candidato-info-value">${candidato.SECUENCIA}</span>
+                            <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.SECUENCIA}', this)"><i class="fas fa-copy"></i></button>
+                        </div>
+                        <div class="candidato-info-item">
+                            <span class="candidato-info-label">Ciclo:</span>
+                            <span class="candidato-info-value">${candidato.CICLO}</span>
+                            <button class="candidato-copy-btn" onclick="copiarTexto('${candidato.CICLO}', this)"><i class="fas fa-copy"></i></button>
+                        </div>
+                        ${candidato.diferencia_puerta !== null ? `
+                        <div class="candidato-info-item" style="grid-column: 1 / -1; background: rgba(102, 126, 234, 0.1);">
+                            <span class="candidato-info-label"><i class="fas fa-ruler-horizontal"></i> Diferencia puerta:</span>
+                            <span class="candidato-info-value" style="color: #667eea; font-weight: 700;">${candidato.diferencia_puerta} ${candidato.diferencia_puerta === 1 ? 'metro' : 'metros'}</span>
+                        </div>
+                        ` : ''}
+                        ${candidato.diferencia_complemento !== null && candidato.diferencia_complemento !== undefined ? `
+                        <div class="candidato-info-item" style="grid-column: 1 / -1; background: rgba(52, 211, 153, 0.1);">
+                            <span class="candidato-info-label"><i class="fas fa-layer-group"></i> Diferencia complemento:</span>
+                            <span class="candidato-info-value" style="color: #10b981; font-weight: 700;">${candidato.diferencia_complemento} ${candidato.diferencia_complemento === 1 ? 'unidad' : 'unidades'} (apto/local/piso)</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            // Mostrar el modal
+            document.getElementById('modalOverlay').classList.add('show');
+            document.body.style.overflow = 'hidden'; // Prevenir scroll del body
+        }
+
+        // Función para cerrar el modal
+        function cerrarModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+            document.body.style.overflow = ''; // Restaurar scroll del body
+        }
+
+        // Cerrar modal con tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                cerrarModal();
+            }
+        });
+
+        // ========== INICIALIZACIÓN DEL MAPA ==========
+        let map;
+        let marker;
+
+        // Inicializar el mapa cuando la página cargue
+        window.addEventListener('load', function() {
+            // Crear el mapa centrado en Colombia (Bogotá por defecto)
+            map = L.map('map').setView([4.6097, -74.0817], 12);
+
+            // Agregar capa de OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Agregar mensaje inicial
+            L.popup()
+                .setLatLng([4.6097, -74.0817])
+                .setContent('<b>📍 Haz clic en el mapa</b><br>para seleccionar coordenadas')
+                .openOn(map);
+
+            // Evento de click en el mapa
+            map.on('click', function(e) {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+
+                // Actualizar inputs de coordenadas
+                document.getElementById('latitud').value = lat.toFixed(6);
+                document.getElementById('longitud').value = lng.toFixed(6);
+
+                // Eliminar marcador anterior si existe
+                if (marker) {
+                    map.removeLayer(marker);
+                }
+
+                // Agregar nuevo marcador
+                marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup(`<b>📍 Ubicación seleccionada</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+            });
+        });
+
+        // Permitir buscar con Enter en inputs de coordenadas
+        document.getElementById('latitud').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                buscarPorCoordenadas();
+            }
+        });
+        document.getElementById('longitud').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                buscarPorCoordenadas();
+            }
+        });
+    </script>
+</body>
+</html>
+
