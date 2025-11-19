@@ -468,7 +468,7 @@ def buscar_candidatos(product_id_buscar):
         
         if resultados.empty:
             return {
-                "error": "No se encontraron productos en la misma localidad con ciclo válido (SESUCICL diferente de 9000 y 4000)",
+                "error": "No se encontraron productos en la misma localidad con ciclo válido (SESUCICL fuera de rangos 4000-4999 y 9000-9999)",
                 "encontrado": True,
                 "producto": producto_info,
                 "candidatos": []
@@ -652,12 +652,16 @@ def buscar_candidatos(product_id_buscar):
                 "diferencia_puerta": candidato_rec["diferencia_puerta"]
             }
         
-        # Análisis de itinerarios
+        # Análisis de itinerarios - TODOS los vecinos del mismo lado de la calle
+        # Usar candidatos_validos que contiene TODOS los vecinos con la misma paridad
         itinerarios_contador = {}
-        for candidato in candidatos_list:
-            itinerario = candidato["ITINERARIO"]
-            if itinerario is not None:
-                itinerarios_contador[itinerario] = itinerarios_contador.get(itinerario, 0) + 1
+        
+        # Contar itinerarios de TODOS los vecinos con la misma paridad (mismo lado de la calle)
+        for idx, row in candidatos_validos.iterrows():
+            itinerario = row["ITINERARIO"]
+            if itinerario is not None and pd.notna(itinerario):
+                itinerario_str = str(int(itinerario)) if isinstance(itinerario, float) else str(itinerario)
+                itinerarios_contador[itinerario_str] = itinerarios_contador.get(itinerario_str, 0) + 1
         
         # Preparar información de itinerarios
         itinerarios_unicos = len(itinerarios_contador)
@@ -665,6 +669,13 @@ def buscar_candidatos(product_id_buscar):
             {"itinerario": itinerario, "cantidad": cantidad}
             for itinerario, cantidad in sorted(itinerarios_contador.items(), key=lambda x: x[1], reverse=True)
         ]
+        
+        # Información adicional sobre la paridad
+        paridad_info = {
+            "paridad": paridad_original if paridad_original else "No determinada",
+            "total_vecinos_misma_paridad": len(candidatos_validos),
+            "numero_puerta_producto": numero_puerta_original
+        }
         
         # Preparar mensajes de vecinos no encontrados
         mensajes_info = []
@@ -728,7 +739,8 @@ def buscar_candidatos(product_id_buscar):
             },
             "itinerarios_info": {
                 "total_unicos": itinerarios_unicos,
-                "detalle": itinerarios_detalle
+                "detalle": itinerarios_detalle,
+                "paridad_info": paridad_info
             }
         }
         
@@ -763,6 +775,92 @@ def buscar():
         return jsonify({"error": "PRODUCT_ID debe ser un número válido", "encontrado": False}), 400
     except Exception as e:
         return jsonify({"error": str(e), "encontrado": False}), 500
+
+@app.route('/api/obtener-vecinos-itinerario', methods=['POST'])
+def obtener_vecinos_itinerario():
+    """
+    Obtiene TODOS los vecinos de un itinerario específico que comparten
+    la misma dirección base y paridad con el producto buscado
+    """
+    try:
+        data = request.json
+        product_id = int(data.get('product_id'))
+        itinerario = str(data.get('itinerario'))
+        
+        if not product_id or not itinerario:
+            return jsonify({"error": "PRODUCT_ID e ITINERARIO requeridos"}), 400
+        
+        config = setup_database()
+        conn = sqlite3.connect(config["ruta"])
+        
+        # Obtener información del producto original
+        df_producto = pd.read_sql_query(
+            f"SELECT * FROM {config['tabla']} WHERE PRODUCT_ID = ?",
+            conn, params=[product_id]
+        )
+        
+        if df_producto.empty:
+            conn.close()
+            return jsonify({"error": "Producto no encontrado"}), 404
+        
+        producto = df_producto.iloc[0]
+        direccion_producto = producto['DIRECCION']
+        numero_puerta_producto = obtener_numero_puerta(direccion_producto)
+        paridad_producto = obtener_paridad_puerta(direccion_producto)
+        
+        # Buscar TODOS los vecinos del itinerario especificado
+        query = f"""
+        SELECT PRODUCT_ID, DIRECCION, ROUTE_ID, ITINERARIO, SECUENCIA, CICLO, SESUCICL
+        FROM {config['tabla']}
+        WHERE ITINERARIO = ?
+        AND DPTO = ?
+        AND MUNICIPIO = ?
+        AND LOCALIDAD = ?
+        AND PRODUCT_ID != ?
+        AND NOT (SESUCICL BETWEEN 4000 AND 4999 OR SESUCICL BETWEEN 9000 AND 9999)
+        ORDER BY SECUENCIA
+        """
+        
+        df_vecinos = pd.read_sql_query(
+            query, conn, 
+            params=[itinerario, producto['DPTO'], producto['MUNICIPIO'], 
+                   producto['LOCALIDAD'], product_id]
+        )
+        
+        conn.close()
+        
+        # Filtrar por dirección equivalente y paridad
+        vecinos_filtrados = []
+        for idx, row in df_vecinos.iterrows():
+            if son_direcciones_equivalentes(direccion_producto, row['DIRECCION']):
+                paridad_vecino = obtener_paridad_puerta(row['DIRECCION'])
+                if paridad_vecino == paridad_producto:
+                    numero_puerta_vecino = obtener_numero_puerta(row['DIRECCION'])
+                    diferencia = abs(numero_puerta_vecino - numero_puerta_producto) if numero_puerta_vecino and numero_puerta_producto else None
+                    
+                    vecinos_filtrados.append({
+                        "PRODUCT_ID": formato_valor_numerico(row['PRODUCT_ID']),
+                        "DIRECCION": row['DIRECCION'],
+                        "ROUTE_ID": formato_valor_numerico(row['ROUTE_ID']),
+                        "ITINERARIO": formato_valor_numerico(row['ITINERARIO']),
+                        "SECUENCIA": formato_valor_numerico(row['SECUENCIA']),
+                        "CICLO": formato_valor_numerico(row['CICLO']),
+                        "diferencia_puerta": diferencia,
+                        "numero_puerta": numero_puerta_vecino
+                    })
+        
+        # Ordenar por diferencia de puerta
+        vecinos_filtrados.sort(key=lambda x: x.get('diferencia_puerta', 999999) if x.get('diferencia_puerta') is not None else 999999)
+        
+        return jsonify({
+            "success": True,
+            "vecinos": vecinos_filtrados,
+            "total": len(vecinos_filtrados),
+            "itinerario": itinerario
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener vecinos: {str(e)}"}), 500
 
 @app.route('/geocodificar', methods=['POST'])
 def geocodificar():
@@ -950,7 +1048,7 @@ def buscar_por_direccion():
                    SESUCICL, MUNICIPIO, LOCALIDAD, CORREGIMIENTO
             FROM {config["tabla"]}
             WHERE 1=1
-            AND SESUCICL NOT IN (9000, 4000)
+            AND NOT (SESUCICL BETWEEN 4000 AND 4999 OR SESUCICL BETWEEN 9000 AND 9999)
         """
         
         params = []

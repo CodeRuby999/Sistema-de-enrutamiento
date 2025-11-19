@@ -1350,13 +1350,47 @@
             // Mostrar análisis de itinerarios (FUERA del collapsable)
             if (data.itinerarios_info && data.itinerarios_info.total_unicos > 0) {
                 const itinerariosSection = document.getElementById('itinerariosSection');
+                const paridadInfo = data.itinerarios_info.paridad_info || {};
+                const paridadTexto = paridadInfo.paridad === 'par' ? 'PAR' : 
+                                    paridadInfo.paridad === 'impar' ? 'IMPAR' : 
+                                    paridadInfo.paridad || 'No determinada';
+                const paridadColor = paridadInfo.paridad === 'par' ? '#10b981' : 
+                                    paridadInfo.paridad === 'impar' ? '#f59e0b' : '#64748b';
+                
                 itinerariosSection.innerHTML = `
                     <h2>
                         <i class="fas fa-chart-bar"></i> Análisis de Itinerarios
                     </h2>
                     <div class="itinerarios-content" id="itinerariosContent">
-                        <div style="margin-bottom: 15px; font-size: 1rem; color: #666;">
-                            <strong>Total de itinerarios únicos:</strong> ${data.itinerarios_info.total_unicos}
+                        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); 
+                                    border-left: 4px solid ${paridadColor}; 
+                                    padding: 15px; 
+                                    border-radius: 8px; 
+                                    margin-bottom: 20px;">
+                            <div style="margin-bottom: 8px; font-size: 0.95rem; color: #64748b; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Análisis de todos los vecinos del mismo lado de la calle</strong>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-road" style="color: ${paridadColor}; font-size: 1.1rem;"></i>
+                                    <span style="color: #475569;">
+                                        <strong>Paridad:</strong> <span style="color: ${paridadColor}; font-weight: 700;">${paridadTexto}</span>
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-users" style="color: #6366f1; font-size: 1.1rem;"></i>
+                                    <span style="color: #475569;">
+                                        <strong>Total vecinos analizados:</strong> <span style="color: #6366f1; font-weight: 700;">${paridadInfo.total_vecinos_misma_paridad || 0}</span>
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-route" style="color: #8b5cf6; font-size: 1.1rem;"></i>
+                                    <span style="color: #475569;">
+                                        <strong>Itinerarios únicos:</strong> <span style="color: #8b5cf6; font-weight: 700;">${data.itinerarios_info.total_unicos}</span>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                         ${data.itinerarios_info.detalle.map(item => `
                             <div class="itinerario-item">
@@ -1674,20 +1708,50 @@
         }
 
         // Función para ver vecinos de un itinerario específico
-        function verCandidatosItinerario(itinerario) {
-            const candidatosFiltrados = candidatosGlobales.filter(c => c.ITINERARIO === itinerario);
-            
-            if (candidatosFiltrados.length === 0) {
-                alert('No se encontraron candidatos para este itinerario');
-                return;
-            }
-
+        async function verCandidatosItinerario(itinerario) {
+            // Mostrar loading
             const modalTitle = document.getElementById('modalTitle');
             const modalBody = document.getElementById('modalBody');
             
-            modalTitle.innerHTML = `<i class="fas fa-route"></i> Itinerario ${itinerario} - ${candidatosFiltrados.length} ${candidatosFiltrados.length === 1 ? 'Candidato' : 'Candidatos'}`;
+            modalTitle.innerHTML = `<i class="fas fa-route"></i> Itinerario ${itinerario}`;
+            modalBody.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner" style="margin: 0 auto;"></div><p style="margin-top: 15px; color: #94a3b8;">Cargando vecinos...</p></div>';
             
-            modalBody.innerHTML = candidatosFiltrados.map((candidato, index) => `
+            // Abrir modal mientras carga
+            document.getElementById('modalOverlay').style.display = 'block';
+            
+            try {
+                // Obtener el PRODUCT_ID del producto buscado
+                const productId = document.getElementById('productId').value;
+                
+                // Hacer petición al backend para obtener TODOS los vecinos del itinerario
+                const response = await fetch('/api/obtener-vecinos-itinerario', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        itinerario: itinerario
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Error al cargar vecinos');
+                }
+                
+                const candidatosFiltrados = data.vecinos;
+                
+                if (candidatosFiltrados.length === 0) {
+                    modalBody.innerHTML = '<div style="text-align: center; padding: 40px; color: #94a3b8;">No se encontraron vecinos para este itinerario en el mismo lado de la calle</div>';
+                    modalTitle.innerHTML = `<i class="fas fa-route"></i> Itinerario ${itinerario} - 0 Vecinos`;
+                    return;
+                }
+                
+                modalTitle.innerHTML = `<i class="fas fa-route"></i> Itinerario ${itinerario} - ${candidatosFiltrados.length} ${candidatosFiltrados.length === 1 ? 'Vecino' : 'Vecinos'}`;
+                
+                modalBody.innerHTML = candidatosFiltrados.map((candidato, index) => `
                 <div class="candidato-card" style="margin-bottom: 20px;">
                     <div class="candidato-header">
                         <span class="candidato-numero">${index + 1}. PRODUCT_ID: ${candidato.PRODUCT_ID}</span>
@@ -1734,6 +1798,18 @@
                     </div>
                 </div>
             `).join('');
+                
+            } catch (error) {
+                console.error('Error al cargar vecinos del itinerario:', error);
+                modalTitle.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Error`;
+                modalBody.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #ef4444;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                        <p style="font-size: 1.1rem; font-weight: 600;">Error al cargar vecinos</p>
+                        <p style="margin-top: 10px; color: #94a3b8;">${error.message}</p>
+                    </div>
+                `;
+            }
             
             // Mostrar el modal
             document.getElementById('modalOverlay').classList.add('show');
