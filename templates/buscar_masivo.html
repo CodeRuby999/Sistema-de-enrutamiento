@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Búsqueda Masiva - Enrutamiento</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .upload-card {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 3px dashed #3b82f6;
+            border-radius: 12px;
+            padding: 60px 20px;
+            background: rgba(59, 130, 246, 0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .upload-area.dragover {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #3b82f6;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #e2e8f0;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-upload:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-info {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-info-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .file-icon {
+            font-size: 2rem;
+            color: #10b981;
+        }
+
+        .file-details {
+            text-align: left;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 5px;
+        }
+
+        .file-size {
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-remove:hover {
+            background: #dc2626;
+        }
+
+        .progress-card {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress-card.show {
+            display: block;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .progress-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #3b82f6;
+        }
+
+        .progress-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.95rem;
+        }
+
+        .progress-bar-container {
+            background: #0f172a;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            width: 100%;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee;
+            border-left: 4px solid #f44;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+            color: #333;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+            color: #e2e8f0;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-cancelar {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn-cancelar:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-cancelar:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-continuar {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
+            text-decoration: none;
+        }
+
+        .btn-continuar:hover {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        .info-box {
+            background: rgba(139, 92, 246, 0.1);
+            border-left: 4px solid #8b5cf6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            color: #e2e8f0;
+        }
+
+        .info-box strong {
+            color: #8b5cf6;
+        }
+
+        .instructions {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .instructions h3 {
+            color: #3b82f6;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instructions li {
+            color: #e2e8f0;
+            margin-bottom: 10px;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .instructions li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .upload-area {
+                padding: 40px 20px;
+            }
+
+            .progress-stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-file-excel"></i> Búsqueda Masiva</h1>
+            <p>Procesa múltiples productos desde un archivo Excel</p>
+            <a href="/" class="back-link">
+                <i class="fas fa-arrow-left"></i> Volver al inicio
+            </a>
+        </div>
+
+        <div class="upload-card">
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <div class="upload-text">
+                    Arrastra tu archivo Excel aquí o haz clic para seleccionar
+                </div>
+                <div class="upload-hint">
+                    Formatos aceptados: .xlsx, .xls (Máximo 5 MB)
+                </div>
+            </div>
+
+            <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+
+            <div class="file-info" id="fileInfo">
+                <div class="file-info-content">
+                    <div class="file-icon">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="file-details">
+                        <div class="file-name" id="fileName"></div>
+                        <div class="file-size" id="fileSize"></div>
+                    </div>
+                    <button class="btn-remove" onclick="removeFile()">
+                        <i class="fas fa-times"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn-upload" id="btnProcesar" onclick="procesarArchivo()" disabled>
+                <i class="fas fa-play"></i> Procesar Archivo
+            </button>
+
+            <div class="instructions">
+                <h3><i class="fas fa-info-circle"></i> Instrucciones</h3>
+                <ul>
+                    <li>El archivo Excel debe contener una columna llamada <strong>PRODUCT_ID</strong></li>
+                    <li>Puede contener cualquier otra columna - todas se mantendrán en el resultado</li>
+                    <li>El sistema buscará el vecino más cercano para cada PRODUCT_ID</li>
+                    <li>El resultado agregará 5 columnas al final: <strong>ROUTE_ID</strong>, <strong>ROUTE_ITINERARY_ID</strong>, <strong>SECUENCIA</strong> (del vecino), <strong>SECUENCIA_SUGERIDA</strong> y <strong>OBSERVACION</strong></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="progress-card" id="progressCard">
+            <div class="progress-header">
+                <div class="progress-title">
+                    <i class="fas fa-cog fa-spin"></i> Procesando...
+                </div>
+                <div class="progress-stats">
+                    <span><strong>Procesados:</strong> <span id="procesados">0</span> / <span id="total">0</span></span>
+                    <span><strong>Tiempo:</strong> <span id="tiempo">0s</span></span>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
+            <div style="text-align: center; color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">
+            </div>
+            
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i> <strong>Puedes continuar usando otras opciones</strong><br>
+                El procesamiento continúa en segundo plano. Cuando termine, vuelve aquí para descargar el resultado.
+            </div>
+            
+            <div style="text-align: center; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn-cancelar" id="btnCancelar" onclick="cancelarProcesamiento()" disabled>
+                    <i class="fas fa-times-circle"></i> Cancelar Procesamiento
+                </button>
+                <a href="/" class="btn-continuar">
+                    <i class="fas fa-arrow-left"></i> Continuar Navegando
+                </a>
+            </div>
+        </div>
+
+        <div class="success-message" id="successMessage">
+            <div style="display: flex; align-items: center; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <div>
+                    <i class="fas fa-check-circle" style="font-size: 2rem; color: #10b981;"></i>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <strong style="font-size: 1.2rem;">¡Procesamiento Completado!</strong>
+                    <p style="margin-top: 5px; font-size: 0.95rem;">El archivo con los resultados está listo para descargar</p>
+                </div>
+                <div>
+                    <a href="#" class="btn-download" id="btnDescargar" download>
+                        <i class="fas fa-download"></i> Descargar Resultados
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let startTime = null;
+        let timerInterval = null;
+        let sessionId = null;
+        let currentSessionId = null; // Para restaurar sesiones
+        let tiempoInicioGlobal = null;
+        let progressInterval = null;
+
+        // Evitar que se limpie la sesión al salir de la página
+        let procesamientoCompletado = false;
+
+        // Antes de salir de la página, guardar el estado
+        window.addEventListener('beforeunload', (e) => {
+            // Solo limpiar intervalos locales, NO el localStorage
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            // NO limpiar localStorage aquí - el procesamiento continúa
+            // El localStorage solo se limpia cuando el procesamiento termina/cancela/error
+        });
+
+        // Configurar drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            // Validar tipo de archivo
+            const validTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel'
+            ];
+            
+            if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+                mostrarError('Por favor selecciona un archivo Excel válido (.xlsx o .xls)');
+                return;
+            }
+
+            // Validar tamaño (5 MB máximo)
+            if (file.size > 5 * 1024 * 1024) {
+                mostrarError('El archivo es demasiado grande. Máximo 5 MB');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // Mostrar información del archivo
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatBytes(file.size);
+            document.getElementById('fileInfo').classList.add('show');
+            document.getElementById('btnProcesar').disabled = false;
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').classList.remove('show');
+            document.getElementById('btnProcesar').disabled = true;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        async function procesarArchivo() {
+            if (!selectedFile) {
+                mostrarError('Por favor selecciona un archivo');
+                return;
+            }
+
+            // Ocultar mensajes previos
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('successMessage').classList.remove('show');
+
+            // Mostrar barra de progreso
+            document.getElementById('progressCard').classList.add('show');
+            document.getElementById('btnProcesar').disabled = true;
+            document.getElementById('btnCancelar').disabled = false;
+
+            // Iniciar temporizador
+            startTime = Date.now();
+            tiempoInicioGlobal = startTime;
+            timerInterval = setInterval(updateTimer, 1000);
+            iniciarTimerGlobal();
+
+            // Crear FormData
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                // Iniciar procesamiento
+                const response = await fetch('/api/procesar-masivo', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Error al procesar el archivo');
+                }
+
+                // Guardar session_id y configurar valores iniciales
+                sessionId = data.session_id;
+                currentSessionId = sessionId; // Variable global para restauración
+                document.getElementById('total').textContent = data.total_productos;
+                document.getElementById('procesados').textContent = '0';
+
+                // Guardar en localStorage para poder restaurar si el usuario navega
+                localStorage.setItem('masivo_session_id', sessionId);
+                localStorage.setItem('masivo_tiempo_inicio', startTime.toString());
+
+                console.log(`✓ Procesamiento iniciado - Session ID: ${sessionId}`);
+                console.log(`✓ Total de productos: ${data.total_productos}`);
+
+                // Iniciar polling del progreso
+                progressInterval = setInterval(checkProgress, 500); // Cada 0.5 segundos
+
+            } catch (error) {
+                clearInterval(timerInterval);
+                mostrarError(error.message);
+                document.getElementById('progressCard').classList.remove('show');
+                document.getElementById('btnProcesar').disabled = false;
+                document.getElementById('btnCancelar').disabled = true;
+            }
+        }
+
+        async function checkProgress() {
+            if (!sessionId) {
+                console.warn('⚠ checkProgress llamado sin sessionId');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/progreso-masivo/${sessionId}`);
+                
+                // Manejar 404: Sesión no encontrada (ya fue limpiada o nunca existió)
+                if (response.status === 404) {
+                    console.error(`✗ Sesión ${sessionId} no encontrada en el servidor. Limpiando localmente.`);
+                    clearInterval(progressInterval);
+                    clearInterval(timerInterval);
+                    // No mostrar error si ya se completó, solo limpiar
+                    if (!procesamientoCompletado) {
+                        mostrarError('La sesión de procesamiento ha expirado o no se encontró. Por favor, intente de nuevo.');
+                    }
+                    limpiarEstado();
+                    return;
+                }
+
+                // Manejar otros errores de red/servidor
+                if (!response.ok) {
+                    throw new Error('Error de red o servidor al obtener el progreso.');
+                }
+                
+                const data = await response.json();
+
+                // Actualizar UI con el progreso
+                const porcentaje = data.total > 0 ? Math.round((data.procesados / data.total) * 100) : 0;
+                document.getElementById('procesados').textContent = data.procesados;
+                document.getElementById('progressBar').style.width = porcentaje + '%';
+                document.getElementById('progressText').textContent = porcentaje + '%';
+
+                // Estado: Error en el backend
+                if (data.status === 'error') {
+                    console.error(`✗ Error en el procesamiento backend: ${data.error}`);
+                    clearInterval(progressInterval);
+                    clearInterval(timerInterval);
+                    mostrarError(data.error || 'Ocurrió un error desconocido durante el procesamiento.');
+                    limpiarEstado();
+                }
+                // Estado: Cancelado por el usuario
+                else if (data.status === 'cancelado') {
+                    console.log(`✗ Procesamiento cancelado por el usuario.`);
+                    clearInterval(progressInterval);
+                    clearInterval(timerInterval);
+                    mostrarError('Procesamiento cancelado.');
+                    limpiarEstado();
+                }
+                // Estado: Completado exitosamente
+                else if (data.completado) {
+                    console.log(`✓ Procesamiento completado. Archivo: ${data.filename}`);
+                    clearInterval(progressInterval);
+                    clearInterval(timerInterval);
+                    procesamientoCompletado = true;
+
+                    // Mostrar mensaje de éxito y botón de descarga
+                    document.getElementById('successMessage').classList.add('show');
+                    const btnDescargar = document.getElementById('btnDescargar');
+                    btnDescargar.href = `/descargar-resultado/${data.filename}`;
+                    btnDescargar.download = data.filename;
+                    
+                    // Limpiar estado y ocultar progreso
+                    limpiarEstado(true); // Limpiar localStorage pero mantener UI de éxito
+                    setTimeout(() => {
+                        document.getElementById('progressCard').classList.remove('show');
+                    }, 2000);
+
+                    // Notificación del navegador
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification("Procesamiento Completado", {
+                            body: "El archivo Excel está listo para descargar.",
+                            icon: "/static/icon.png"
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error(`✗ Error crítico en checkProgress: ${error.message}`);
+                clearInterval(progressInterval);
+                clearInterval(timerInterval);
+                mostrarError('No se pudo verificar el progreso. Revise la conexión y vuelva a intentarlo.');
+                limpiarEstado();
+            }
+        }
+
+        async function cancelarProcesamiento() {
+            if (!sessionId) return;
+
+            if (!confirm('¿Estás seguro de que quieres cancelar el procesamiento?')) {
+                return;
+            }
+
+            try {
+                console.log(`⚠ Cancelando procesamiento...`);
+                
+                const response = await fetch(`/api/cancelar-masivo/${sessionId}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    console.log(`✓ Cancelación solicitada`);
+                    document.getElementById('btnCancelar').disabled = true;
+                    
+                    // Limpiar localStorage
+                    localStorage.removeItem('masivo_session_id');
+                    localStorage.removeItem('masivo_tiempo_inicio');
+                }
+
+            } catch (error) {
+                console.error(`✗ Error al cancelar: ${error.message}`);
+                mostrarError('Error al cancelar el procesamiento');
+            }
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('tiempo').textContent = `${elapsed}s`;
+        }
+
+        function iniciarTimerGlobal() {
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - tiempoInicioGlobal) / 1000);
+                document.getElementById('tiempo').textContent = `${elapsed}s`;
+            }, 1000);
+        }
+
+        function mostrarError(mensaje) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + mensaje;
+            errorDiv.classList.add('show');
+        }
+
+        function limpiarEstado(mantenerExito = false) {
+            console.log('🧹 Limpiando estado de la sesión...');
+            
+            if (progressInterval) clearInterval(progressInterval);
+            if (timerInterval) clearInterval(timerInterval);
+            
+            sessionId = null;
+            currentSessionId = null;
+            tiempoInicioGlobal = null;
+            
+            localStorage.removeItem('masivo_session_id');
+            localStorage.removeItem('masivo_tiempo_inicio');
+            
+            document.getElementById('progressCard').classList.remove('show');
+            document.getElementById('btnProcesar').disabled = false;
+            document.getElementById('btnCancelar').disabled = true;
+            
+            if (!mantenerExito) {
+                document.getElementById('successMessage').classList.remove('show');
+            }
+            
+            removeFile();
+        }
+      // Agregar funcionalidad de notificación del navegador
+      document.addEventListener('DOMContentLoaded', function() {
+          // Pedir permiso para notificaciones
+          if ("Notification" in window && Notification.permission === "default") {
+              Notification.requestPermission();
+          }
+          
+          // Restaurar estado del procesamiento si hay uno en curso
+          restaurarEstadoProcesamiento();
+      });
+
+      function restaurarEstadoProcesamiento() {
+          const savedSessionId = localStorage.getItem('masivo_session_id');
+          const tiempoInicio = localStorage.getItem('masivo_tiempo_inicio');
+          
+          if (savedSessionId && tiempoInicio) {
+              console.log(`🔄 Verificando sesión guardada: ${savedSessionId}`);
+              
+              // Verificar si el procesamiento aún está activo
+              fetch(`/api/progreso-masivo/${savedSessionId}`)
+                  .then(response => response.json())
+                  .then(data => {
+                      if (!data.completado && !data.cancelado && data.status !== 'error') {
+                          console.log('✓ Restaurando procesamiento en curso...');
+                          console.log(`📊 Progreso: ${data.procesados}/${data.total} (${Math.round((data.procesados / data.total) * 100)}%)`);
+                          
+                          // Mostrar el progreso
+                          document.getElementById('progressCard').classList.add('show');
+                          document.getElementById('btnCancelar').disabled = false;
+                          document.getElementById('btnProcesar').disabled = true;
+                          
+                          // Actualizar valores en la UI
+                          document.getElementById('total').textContent = data.total;
+                          document.getElementById('procesados').textContent = data.procesados;
+                          const porcentaje = Math.round((data.procesados / data.total) * 100);
+                          document.getElementById('progressBar').style.width = porcentaje + '%';
+                          document.getElementById('progressText').textContent = porcentaje + '%';
+                          
+                          // Continuar el seguimiento
+                          iniciarSeguimientoProgreso(savedSessionId, parseInt(tiempoInicio));
+                      } else {
+                          console.log('✓ Procesamiento ya terminó');
+                          // Limpiar si ya terminó
+                          localStorage.removeItem('masivo_session_id');
+                          localStorage.removeItem('masivo_tiempo_inicio');
+                      }
+                  })
+                  .catch(error => {
+                      console.log('⚠ No hay procesamiento activo para restaurar');
+                      localStorage.removeItem('masivo_session_id');
+                      localStorage.removeItem('masivo_tiempo_inicio');
+                  });
+          }
+      }
+
+      function iniciarSeguimientoProgreso(sid, tiempoInicio) {
+          // Asignar a la variable global sessionId
+          sessionId = sid;
+          currentSessionId = sid;
+          tiempoInicioGlobal = tiempoInicio || Date.now();
+          
+          // Iniciar timer
+          iniciarTimerGlobal();
+          
+          // Iniciar polling del progreso
+          if (progressInterval) {
+              clearInterval(progressInterval);
+          }
+          progressInterval = setInterval(checkProgress, 500);
+          
+          console.log(`✓ Seguimiento iniciado para sesión: ${sid}`);
+      }
+
+      </script>
+</body>
+</html>
+

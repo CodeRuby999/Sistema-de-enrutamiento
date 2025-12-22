@@ -956,6 +956,20 @@
     </style>
 </head>
 <body class="dark-mode">
+    <!-- Notificación de procesamiento en curso -->
+    <div id="notificacionProcesando" style="display: none; position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 10px 30px rgba(139, 92, 246, 0.5); z-index: 10000; animation: slideInRight 0.5s ease;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <i class="fas fa-spinner fa-spin"></i>
+            <div>
+                <div style="font-weight: 600; font-size: 0.95rem;">Procesamiento en curso</div>
+                <div id="notificacionDetalle" style="font-size: 0.85rem; opacity: 0.9; margin-top: 3px;">Búsqueda masiva en segundo plano</div>
+            </div>
+            <a href="/buscar-masivo" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-left: 10px;">
+                Ver Progreso
+            </a>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-map-marker-alt"></i> Sistema de Enrutamiento</h1>
@@ -1828,7 +1842,57 @@
             // DOM ya está listo
             init();
         }
+
+        // Verificar procesamiento masivo en curso
+        document.addEventListener('DOMContentLoaded', function() {
+            (function verificarProcesamientoMasivo() {
+                const sessionId = localStorage.getItem('masivo_session_id');
+                
+                if (sessionId) {
+                    fetch(`/api/progreso-masivo/${sessionId}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('No se pudo obtener el estado');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.completado && !data.cancelado && data.status !== 'error') {
+                                const porcentaje = Math.round((data.procesados / data.total) * 100);
+                                document.getElementById('notificacionDetalle').textContent = 
+                                    `${data.procesados} de ${data.total} productos (${porcentaje}%)`;
+                                document.getElementById('notificacionProcesando').style.display = 'block';
+                                setTimeout(verificarProcesamientoMasivo, 2000);
+                            } else {
+                                document.getElementById('notificacionProcesando').style.display = 'none';
+                                if (data.completado || data.cancelado || data.status === 'error') {
+                                    localStorage.removeItem('masivo_session_id');
+                                    localStorage.removeItem('masivo_tiempo_inicio');
+                                }
+                            }
+                        })
+                        .catch((error) => {
+                            console.log('Error verificando procesamiento masivo:', error);
+                            // No mostrar notificación, pero mantener sesión por si acaso
+                            document.getElementById('notificacionProcesando').style.display = 'none';
+                        });
+                }
+            })();
+        });
     </script>
+
+    <style>
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </body>
 </html>
 

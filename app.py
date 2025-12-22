@@ -1,15 +1,24 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
 import sqlite3
 import pandas as pd
 import re
 import time
+import os
+import json
+from datetime import datetime
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+import threading
+from functools import lru_cache
 
 app = Flask(__name__)
 
 # ============== CONFIGURACIÓN ==============
 # (Sin variables de configuración - la lógica busca solo vecinos inmediatos)
+
+# Variables globales para control de procesamiento masivo
+procesamiento_masivo_estado = {}
+procesamiento_masivo_lock = threading.Lock()
 
 def normalizar_direccion_completa(direccion):
     """
@@ -297,6 +306,41 @@ def son_direcciones_equivalentes(dir1, dir2):
     
     return False
 
+# ============== FUNCIONES OPTIMIZADAS PARA PROCESAMIENTO MASIVO ==============
+
+@lru_cache(maxsize=10000)
+def son_direcciones_equivalentes_rapido(dir1, dir2):
+    """
+    Versión optimizada y simplificada de comparación de direcciones para procesamiento masivo.
+    Usa caching (lru_cache) para evitar recalcular direcciones ya vistas.
+    """
+    # Normalizar
+    d1 = dir1.upper().strip()
+    d2 = dir2.upper().strip()
+    
+    # Extraer tipo de vía y números principales (sin parsing complejo)
+    # Ejemplo: "CL 70 CR 25" -> ["CL", "70", "CR", "25"]
+    tokens1 = re.findall(r'(?:CL|CR|DG|TR|AV|KR|CALLE|CARRERA|DIAGONAL|TRANSVERSAL|AVENIDA)|\d+[A-Z]*', d1)
+    tokens2 = re.findall(r'(?:CL|CR|DG|TR|AV|KR|CALLE|CARRERA|DIAGONAL|TRANSVERSAL|AVENIDA)|\d+[A-Z]*', d2)
+    
+    if len(tokens1) < 2 or len(tokens2) < 2:
+        return False
+    
+    # Comparar los primeros 4 tokens (tipo vía + número + tipo vía 2 + número 2)
+    # Esto cubre tanto direcciones simples como intersecciones
+    tokens_to_compare = min(4, len(tokens1), len(tokens2))
+    return tokens1[:tokens_to_compare] == tokens2[:tokens_to_compare]
+
+@lru_cache(maxsize=10000)
+def obtener_numero_puerta_cached(direccion):
+    """Versión con caché de obtener_numero_puerta"""
+    return obtener_numero_puerta(direccion)
+
+@lru_cache(maxsize=10000)
+def obtener_paridad_puerta_cached(direccion):
+    """Versión con caché de obtener_paridad_puerta"""
+    return obtener_paridad_puerta(direccion)
+
 def calcular_diferencia_puerta(dir1, dir2):
     """Calcula la diferencia numérica entre los números de puerta"""
     if not son_direcciones_equivalentes(dir1, dir2):
@@ -448,6 +492,7 @@ def buscar_candidatos(product_id_buscar):
         AND LOCALIDAD = ?
         AND PRODUCT_ID != ?
         AND ROUTE_ID IS NOT NULL
+        AND SESUCICL NOT IN (9000, 4000, 6000)
 
         """
         
@@ -468,7 +513,7 @@ def buscar_candidatos(product_id_buscar):
         
         if resultados.empty:
             return {
-                "error": "No se encontraron productos en la misma localidad con ciclo válido (SESUCICL fuera de rangos 4000-4999 y 9000-9999)",
+                "error": "No se encontraron productos en la misma localidad con ciclo válido (SESUCICL diferente de 9000, 4000 y 6000)",
                 "encontrado": True,
                 "producto": producto_info,
                 "candidatos": []
@@ -617,30 +662,15 @@ def buscar_candidatos(product_id_buscar):
                 numero_puerta_vecino = obtener_numero_puerta(candidato_rec["DIRECCION"])
                 
                 if numero_puerta_original and numero_puerta_vecino:
-                    # Si el vecino está después (número mayor), restar 1 a su secuencia
-                    if numero_puerta_vecino > numero_puerta_original:
+                    # Si el vecino está antes (número menor), restar 1 a su secuencia
+                    if numero_puerta_vecino < numero_puerta_original:
                         secuencia_sugerida = secuencia_vecino - 1
-                    # Si el vecino está antes (número menor), sumar 1 a su secuencia
-                    elif numero_puerta_vecino < numero_puerta_original:
+                    # Si el vecino está después (número mayor), sumar 1 a su secuencia
+                    elif numero_puerta_vecino > numero_puerta_original:
                         secuencia_sugerida = secuencia_vecino + 1
-                    # Si tienen el mismo número de puerta, analizar el complemento (apto, local, etc.)
+                    # Si tienen el mismo número de puerta, sumar 1 a la secuencia
                     else:
-                        complemento_producto = obtener_numero_complemento(info_producto['DIRECCION'])
-                        complemento_vecino = obtener_numero_complemento(candidato_rec["DIRECCION"])
-                        
-                        if complemento_producto is not None and complemento_vecino is not None:
-                            # Si el complemento del vecino es mayor (está después), restar 1
-                            if complemento_vecino > complemento_producto:
-                                secuencia_sugerida = secuencia_vecino - 1
-                            # Si el complemento del vecino es menor (está antes), sumar 1
-                            elif complemento_vecino < complemento_producto:
                                 secuencia_sugerida = secuencia_vecino + 1
-                            # Si son exactamente iguales, usar la misma secuencia (caso muy raro)
-                            else:
-                                secuencia_sugerida = secuencia_vecino
-                        else:
-                            # Si no hay complemento para comparar, usar la misma secuencia
-                            secuencia_sugerida = secuencia_vecino
             
             recomendacion = {
                 "DIRECCION": candidato_rec["DIRECCION"],
@@ -658,7 +688,7 @@ def buscar_candidatos(product_id_buscar):
         
         # Contar itinerarios de TODOS los vecinos con la misma paridad (mismo lado de la calle)
         for idx, row in candidatos_validos.iterrows():
-            itinerario = row["ITINERARIO"]
+            itinerario = row["ROUTE_ITINERARY_ID"]
             if itinerario is not None and pd.notna(itinerario):
                 itinerario_str = str(int(itinerario)) if isinstance(itinerario, float) else str(itinerario)
                 itinerarios_contador[itinerario_str] = itinerarios_contador.get(itinerario_str, 0) + 1
@@ -810,15 +840,18 @@ def obtener_vecinos_itinerario():
         
         # Buscar TODOS los vecinos del itinerario especificado
         query = f"""
-        SELECT PRODUCT_ID, DIRECCION, ROUTE_ID, ITINERARIO, SECUENCIA, CICLO, SESUCICL
+        SELECT PRODUCT_ID, DIRECCION, ROUTE_ID, 
+               ROUTE_ITINERARY_ID AS ITINERARIO, 
+               CONSECUTIVE AS SECUENCIA, 
+               SESUCICL AS CICLO
         FROM {config['tabla']}
-        WHERE ITINERARIO = ?
+        WHERE ROUTE_ITINERARY_ID = ?
         AND DPTO = ?
         AND MUNICIPIO = ?
         AND LOCALIDAD = ?
         AND PRODUCT_ID != ?
-        AND NOT (SESUCICL BETWEEN 4000 AND 4999 OR SESUCICL BETWEEN 9000 AND 9999)
-        ORDER BY SECUENCIA
+        AND SESUCICL NOT IN (9000, 4000, 6000)
+        ORDER BY CONSECUTIVE
         """
         
         df_vecinos = pd.read_sql_query(
@@ -987,11 +1020,16 @@ def obtener_ubicaciones():
         
         conn.close()
         
+        # En lugar de un diccionario, se devuelve una lista para garantizar el orden
+        ubicaciones_ordenadas = [
+            {"tipo": "Municipios", "items": municipios},
+            {"tipo": "Localidades", "items": localidades},
+            {"tipo": "Corregimientos", "items": corregimientos}
+        ]
+        
         return jsonify({
             "success": True,
-            "municipios": municipios,
-            "localidades": localidades,
-            "corregimientos": corregimientos
+            "ubicaciones": ubicaciones_ordenadas
         })
     
     except Exception as e:
@@ -1044,11 +1082,14 @@ def buscar_por_direccion():
         
         # Construir query base
         query = f"""
-            SELECT PRODUCT_ID, DIRECCION, ROUTE_ID, ITINERARIO, SECUENCIA, CICLO, 
-                   SESUCICL, MUNICIPIO, LOCALIDAD, CORREGIMIENTO
+            SELECT PRODUCT_ID, DIRECCION, ROUTE_ID, 
+                   ROUTE_ITINERARY_ID AS ITINERARIO, 
+                   CONSECUTIVE AS SECUENCIA, 
+                   SESUCICL AS CICLO, 
+                   MUNICIPIO, LOCALIDAD, CORREGIMIENTO
             FROM {config["tabla"]}
             WHERE 1=1
-            AND NOT (SESUCICL BETWEEN 4000 AND 4999 OR SESUCICL BETWEEN 9000 AND 9999)
+            AND SESUCICL NOT IN (9000, 4000, 6000)
         """
         
         params = []
@@ -1140,6 +1181,637 @@ def buscar_por_direccion():
         return jsonify({
             "error": f"Error al buscar por dirección: {str(e)}"
         }), 500
+
+@app.route('/buscar-cuenta')
+def buscar_cuenta_page():
+    """Página de búsqueda por Cuenta (SUBSCRIPTION_ID)"""
+    return render_template('buscar_cuenta.html')
+
+@app.route('/api/buscar-por-cuenta', methods=['POST'])
+def buscar_por_cuenta():
+    """
+    Busca productos por número de cuenta (SUBSCRIPTION_ID)
+    """
+    try:
+        data = request.json
+        subscription_id = data.get('subscription_id', '').strip()
+        
+        if not subscription_id:
+            return jsonify({
+                "error": "Debe proporcionar un número de cuenta",
+                "success": False
+            }), 400
+        
+        config = setup_database()
+        conn = sqlite3.connect(config["ruta"])
+        
+        # Buscar productos con este SUBSCRIPTION_ID
+        query = f"""
+            SELECT PRODUCT_ID, SUBSCRIPTION_ID, DIRECCION, DPTO, MUNICIPIO, LOCALIDAD, 
+                   ROUTE_ID, SESUCICL, ROUTE_ITINERARY_ID, CONSECUTIVE
+            FROM {config["tabla"]}
+            WHERE SUBSCRIPTION_ID = ?
+            ORDER BY PRODUCT_ID
+        """
+        
+        df = pd.read_sql_query(query, conn, params=[subscription_id])
+        df = corrige_utf8(df)
+        conn.close()
+        
+        if df.empty:
+            return jsonify({
+                "error": f"No se encontraron productos para la cuenta: {subscription_id}",
+                "success": False
+            })
+        
+        # Convertir a lista de diccionarios
+        productos = df.to_dict('records')
+        
+        # Formatear valores numéricos
+        for producto in productos:
+            producto['PRODUCT_ID'] = formato_valor_numerico(producto.get('PRODUCT_ID'))
+            producto['ROUTE_ID'] = formato_valor_numerico(producto.get('ROUTE_ID'))
+            producto['SESUCICL'] = formato_valor_numerico(producto.get('SESUCICL'))
+            producto['ROUTE_ITINERARY_ID'] = formato_valor_numerico(producto.get('ROUTE_ITINERARY_ID'))
+            producto['CONSECUTIVE'] = formato_valor_numerico(producto.get('CONSECUTIVE'))
+        
+        return jsonify({
+            "success": True,
+            "productos": productos,
+            "total": len(productos),
+            "mensaje": f"Se encontraron {len(productos)} producto(s) para la cuenta {subscription_id}"
+        })
+    
+    except Exception as e:
+        return jsonify({
+            "error": f"Error al buscar por cuenta: {str(e)}",
+            "success": False
+        }), 500
+
+def buscar_candidatos_rapido(product_id_buscar, conn):
+    """
+    Versión optimizada de buscar_candidatos sin geocodificación
+    Recibe una conexión existente para mejor performance
+    """
+    config = setup_database()
+    tiempo_inicio = time.time()
+    
+    try:
+        # Buscar el producto
+        info_producto = pd.read_sql_query(
+            f"SELECT * FROM {config['tabla']} WHERE PRODUCT_ID = ?", 
+            conn, params=[product_id_buscar])
+        info_producto = corrige_utf8(info_producto)
+        
+        if info_producto.empty:
+            return {
+                "error": "No se encontró el PRODUCT_ID en la base de datos",
+                "encontrado": False
+            }
+        
+        info_producto = info_producto.iloc[0]
+        direccion_original = info_producto['DIRECCION']
+        
+        # Extraer componentes del producto original (con caché)
+        numero_puerta_original = obtener_numero_puerta_cached(direccion_original)
+        paridad_original = obtener_paridad_puerta_cached(direccion_original)
+        
+        # Buscar en misma localidad
+        query = f"""
+        SELECT *, '{config['tabla']}' AS fuente 
+        FROM {config['tabla']} 
+        WHERE DPTO = ? 
+        AND MUNICIPIO = ? 
+        AND LOCALIDAD = ?
+        AND PRODUCT_ID != ?
+        AND ROUTE_ID IS NOT NULL
+        AND SESUCICL NOT IN (9000, 4000, 6000)
+        """
+        
+        resultados = pd.read_sql_query(
+            query, conn, 
+            params=[info_producto['DPTO'], info_producto['MUNICIPIO'], 
+                    info_producto['LOCALIDAD'], product_id_buscar])
+        resultados = corrige_utf8(resultados)
+        
+        if resultados.empty:
+            return {
+                "error": "No se encontraron productos en la misma localidad",
+                "encontrado": True,
+                "recomendacion": None
+            }
+        
+        # Filtrar por dirección equivalente (versión rápida)
+        resultados["es_misma_direccion"] = resultados["DIRECCION"].apply(
+            lambda d: son_direcciones_equivalentes_rapido(direccion_original, d))
+        
+        candidatos_misma_calle = resultados[resultados["es_misma_direccion"] == True].copy()
+        
+        if candidatos_misma_calle.empty:
+            return {
+                "error": "No se encontraron candidatos en la misma dirección",
+                "encontrado": True,
+                "recomendacion": None
+            }
+        
+        # Calcular métricas (con versiones cacheadas)
+        candidatos_misma_calle["numero_puerta"] = candidatos_misma_calle["DIRECCION"].apply(obtener_numero_puerta_cached)
+        candidatos_misma_calle["paridad"] = candidatos_misma_calle["DIRECCION"].apply(obtener_paridad_puerta_cached)
+        
+        # Calcular diferencia de puerta de forma eficiente
+        if numero_puerta_original:
+            candidatos_misma_calle["diferencia_puerta"] = candidatos_misma_calle["numero_puerta"].apply(
+                lambda np: abs(np - numero_puerta_original) if np else None)
+        else:
+            candidatos_misma_calle["diferencia_puerta"] = None
+        
+        # Filtrar por paridad
+        if paridad_original:
+            candidatos_misma_calle = candidatos_misma_calle[
+                candidatos_misma_calle["paridad"] == paridad_original].copy()
+        
+        # Filtrar candidatos válidos
+        candidatos_validos = candidatos_misma_calle[
+            candidatos_misma_calle["diferencia_puerta"].notna()].copy()
+        
+        if candidatos_validos.empty:
+            return {
+                "error": "No se encontraron candidatos válidos",
+                "encontrado": True,
+                "recomendacion": None
+            }
+        
+        # Buscar el vecino más cercano
+        candidato_mas_cercano = candidatos_validos.nsmallest(1, "diferencia_puerta").iloc[0]
+        
+        # Calcular secuencia sugerida
+        secuencia_sugerida = None
+        secuencia_vecino = formato_valor_numerico(candidato_mas_cercano['CONSECUTIVE'])
+        numero_puerta_vecino = candidato_mas_cercano['numero_puerta']
+        
+        if secuencia_vecino is not None and numero_puerta_original and numero_puerta_vecino:
+            if numero_puerta_vecino < numero_puerta_original:
+                secuencia_sugerida = secuencia_vecino - 1
+            elif numero_puerta_vecino > numero_puerta_original:
+                secuencia_sugerida = secuencia_vecino + 1
+            else:
+                secuencia_sugerida = secuencia_vecino + 1
+        
+        recomendacion = {
+            "DIRECCION": candidato_mas_cercano['DIRECCION'],
+            "ROUTE_ID": formato_valor_numerico(candidato_mas_cercano['ROUTE_ID']),
+            "ITINERARIO": formato_valor_numerico(candidato_mas_cercano['ROUTE_ITINERARY_ID']),
+            "SECUENCIA": secuencia_vecino,
+            "SECUENCIA_SUGERIDA": secuencia_sugerida,
+            "CICLO": formato_valor_numerico(candidato_mas_cercano['SESUCICL']),
+            "diferencia_puerta": int(candidato_mas_cercano['diferencia_puerta']) if pd.notna(candidato_mas_cercano['diferencia_puerta']) else None
+        }
+        
+        tiempo_total = time.time() - tiempo_inicio
+        if tiempo_total > 2.0:  # Solo logear si toma más de 2 segundos
+            print(f"[PERF] PRODUCT_ID {product_id_buscar} procesado en {tiempo_total:.2f}s")
+        
+        return {
+            "encontrado": True,
+            "recomendacion": recomendacion,
+            "candidatos": [],  # No necesitamos la lista completa para masivo
+            "itinerarios_info": {"total_unicos": 0}  # Simplificado
+        }
+        
+    except Exception as e:
+        return {
+            "error": f"Error al procesar: {str(e)}",
+            "encontrado": False,
+            "recomendacion": None
+        }
+
+@app.route('/buscar-masivo')
+def buscar_masivo_page():
+    """Página de búsqueda masiva (Excel)"""
+    return render_template('buscar_masivo.html')
+
+@app.route('/api/procesar-masivo', methods=['POST'])
+def procesar_masivo():
+    """
+    Inicia el procesamiento masivo en background y retorna un ID de sesión
+    """
+    try:
+        # Verificar que se haya subido un archivo
+        if 'file' not in request.files:
+            return jsonify({"error": "No se ha subido ningún archivo"}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({"error": "Nombre de archivo vacío"}), 400
+        
+        # Verificar extensión
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({"error": "El archivo debe ser Excel (.xlsx o .xls)"}), 400
+        
+        # Leer el archivo Excel
+        try:
+            df_input = pd.read_excel(file)
+        except Exception as e:
+            return jsonify({"error": f"Error al leer el archivo Excel: {str(e)}"}), 400
+        
+        # Verificar que exista la columna PRODUCT_ID
+        if 'PRODUCT_ID' not in df_input.columns:
+            return jsonify({"error": "El archivo debe contener una columna llamada 'PRODUCT_ID'"}), 400
+        
+        # Generar ID de sesión único
+        session_id = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        
+        # Inicializar estado
+        with procesamiento_masivo_lock:
+            procesamiento_masivo_estado[session_id] = {
+                'status': 'iniciando',
+                'procesados': 0,
+                'total': len(df_input),
+                'cancelado': False,
+                'completado': False,
+                'error': None,
+                'filename': None
+            }
+            print(f"[INICIO] Sesión {session_id} creada. Total productos: {len(df_input)}")
+            print(f"[INICIO] Sesiones activas: {list(procesamiento_masivo_estado.keys())}")
+        
+        # Iniciar procesamiento en thread separado
+        thread = threading.Thread(
+            target=procesar_masivo_background,
+            args=(session_id, df_input)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "total_productos": len(df_input)
+        })
+    
+    except Exception as e:
+        return jsonify({
+            "error": f"Error al iniciar procesamiento: {str(e)}",
+            "success": False
+        }), 500
+
+def obtener_secuencias_existentes(route_id, itinerario, conn):
+    """
+    Obtiene todas las secuencias ya existentes en la BD para un itinerario.
+    Esto evita conflictos con productos ya enrutados.
+    """
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT DISTINCT CAST(CONSECUTIVE AS INTEGER) as SEC
+            FROM PRODUCT_DATA
+            WHERE ROUTE_ID = ? 
+              AND ROUTE_ITINERARY_ID = ?
+              AND CONSECUTIVE IS NOT NULL
+              AND CONSECUTIVE != ''
+              AND CONSECUTIVE != 'None'
+        """
+        cursor.execute(query, (route_id, itinerario))
+        resultados = cursor.fetchall()
+        return [r[0] for r in resultados if r[0] is not None]
+    except Exception as e:
+        print(f"[ERROR] obtener_secuencias_existentes: {e}")
+        return []
+
+def resolver_conflicto_secuencia(route_id, itinerario, secuencia_vecino, 
+                                  secuencia_sugerida_inicial, secuencias_ocupadas, conn):
+    """
+    Resuelve conflictos de secuencia duplicada en procesamiento masivo.
+    
+    Parámetros:
+    - route_id: ROUTE_ID del itinerario
+    - itinerario: ROUTE_ITINERARY_ID
+    - secuencia_vecino: Secuencia original del vecino
+    - secuencia_sugerida_inicial: Secuencia inicialmente calculada (vecino ±1)
+    - secuencias_ocupadas: Dict {(route_id, itinerario): set(secuencias)}
+    - conn: Conexión a la BD
+    
+    Retorna:
+    - Secuencia final sin conflictos
+    """
+    # Si algún valor es None o vacío, retornar el inicial
+    if not route_id or not itinerario or secuencia_sugerida_inicial == '':
+        return secuencia_sugerida_inicial
+    
+    try:
+        route_id = int(route_id) if route_id else None
+        itinerario = int(itinerario) if itinerario else None
+        secuencia_vecino = int(secuencia_vecino) if secuencia_vecino else None
+        secuencia_inicial = int(secuencia_sugerida_inicial) if secuencia_sugerida_inicial else None
+        
+        if route_id is None or itinerario is None or secuencia_inicial is None:
+            return secuencia_sugerida_inicial
+        
+    except (ValueError, TypeError):
+        return secuencia_sugerida_inicial
+    
+    # Clave para el diccionario
+    clave_itinerario = (route_id, itinerario)
+    
+    # Inicializar set si no existe
+    if clave_itinerario not in secuencias_ocupadas:
+        # Obtener secuencias ya existentes en la BD para este itinerario
+        secuencias_existentes = obtener_secuencias_existentes(route_id, itinerario, conn)
+        secuencias_ocupadas[clave_itinerario] = set(secuencias_existentes)
+    
+    # Obtener set de secuencias ocupadas
+    ocupadas = secuencias_ocupadas[clave_itinerario]
+    
+    # Si no hay conflicto, usar la secuencia inicial
+    if secuencia_inicial not in ocupadas:
+        ocupadas.add(secuencia_inicial)
+        return secuencia_inicial
+    
+    # 🔥 HAY CONFLICTO - Buscar siguiente disponible
+    # Determinar dirección: ¿estamos sumando o restando?
+    direccion = 1 if secuencia_inicial > secuencia_vecino else -1
+    
+    # Buscar siguiente secuencia libre
+    secuencia_candidata = secuencia_inicial
+    intentos = 0
+    max_intentos = 10000  # Máximo 10000 intentos
+    
+    while secuencia_candidata in ocupadas and intentos < max_intentos:
+        secuencia_candidata += direccion
+        intentos += 1
+        
+        # Verificar límites relativos (no absolutos)
+        if secuencia_candidata <= 0:
+            # Llegamos a 0, cambiar a sumar
+            direccion = 1
+            secuencia_candidata = secuencia_inicial + 1
+        elif abs(secuencia_candidata - secuencia_inicial) > 50000:
+            # Nos alejamos demasiado (más de 50000 posiciones)
+            print(f"[WARN] No se encontró secuencia libre cerca de {secuencia_inicial} para Route {route_id}, Itinerario {itinerario}")
+            # Usar la secuencia candidata actual aunque esté lejos
+            break
+    
+    # Verificar si realmente encontramos una secuencia libre
+    if secuencia_candidata in ocupadas:
+        # Si después de todos los intentos aún está ocupada, forzar una secuencia única
+        print(f"[ERROR] No se pudo encontrar secuencia libre para Route {route_id}, Itinerario {itinerario}. Forzando secuencia.")
+        # Buscar el máximo y agregar 1
+        secuencia_candidata = max(ocupadas) + 1 if ocupadas else secuencia_inicial
+    
+    # Marcar como ocupada y retornar
+    ocupadas.add(secuencia_candidata)
+    
+    # Log si hubo ajuste significativo
+    if abs(secuencia_candidata - secuencia_inicial) > 1:
+        print(f"[SECUENCIA] Ajuste: {secuencia_inicial} → {secuencia_candidata} "
+              f"(Route {route_id}, Itinerario {itinerario})")
+    
+    return secuencia_candidata
+
+def procesar_masivo_background(session_id, df_input):
+    """
+    Procesa el archivo en background con actualizaciones de progreso
+    """
+    print(f"[BACKGROUND] Thread iniciado para sesión {session_id}")
+    config = setup_database()
+    conn = None
+    
+    try:
+        # Abrir conexión
+        conn = sqlite3.connect(config["ruta"])
+        print(f"[BACKGROUND] Conexión a BD establecida para sesión {session_id}")
+        
+        resultados = []
+        total_productos = len(df_input)
+        
+        # 🔑 NUEVO: Diccionario para rastrear secuencias usadas por itinerario
+        # Estructura: {(ROUTE_ID, ROUTE_ITINERARY_ID): set(secuencias_usadas)}
+        secuencias_ocupadas = {}
+        
+        # Actualizar estado
+        with procesamiento_masivo_lock:
+            if session_id not in procesamiento_masivo_estado:
+                print(f"[BACKGROUND ERROR] Sesión {session_id} desapareció antes de iniciar procesamiento!")
+                return
+            procesamiento_masivo_estado[session_id]['status'] = 'procesando'
+            print(f"[BACKGROUND] Estado cambiado a 'procesando' para sesión {session_id}")
+        
+        # Variables de métricas
+        tiempo_inicio_procesamiento = time.time()
+        tiempo_total_busquedas = 0
+        
+        # Procesar cada producto
+        for idx, row in df_input.iterrows():
+            # Verificar si fue cancelado
+            with procesamiento_masivo_lock:
+                if procesamiento_masivo_estado[session_id]['cancelado']:
+                    procesamiento_masivo_estado[session_id]['status'] = 'cancelado'
+                    return
+            
+            product_id = row['PRODUCT_ID']
+            tiempo_inicio_producto = time.time()
+            
+            # Buscar candidatos
+            resultado_busqueda = buscar_candidatos_rapido(str(product_id), conn)
+            tiempo_total_busquedas += (time.time() - tiempo_inicio_producto)
+            
+            # Preparar fila de resultado - SOLO con datos originales + recomendación
+            fila_resultado = {}
+            
+            # Copiar TODAS las columnas del Excel original
+            for columna in df_input.columns:
+                fila_resultado[columna] = row[columna]
+            
+            # Agregar columnas de resultado (del vecino más cercano)
+            if resultado_busqueda.get('encontrado') and resultado_busqueda.get('recomendacion'):
+                rec = resultado_busqueda['recomendacion']
+                
+                # Obtener valores básicos
+                route_id = rec.get('ROUTE_ID', '')
+                itinerario = rec.get('ITINERARIO', '')
+                secuencia = rec.get('SECUENCIA', '')
+                secuencia_sugerida_inicial = rec.get('SECUENCIA_SUGERIDA', '')
+                
+                # Debug: Log si los valores están vacíos o None
+                if not route_id or not itinerario:
+                    print(f"[DEBUG] PRODUCT_ID {product_id}: ROUTE_ID={route_id}, ITINERARIO={itinerario}")
+                    print(f"[DEBUG] Recomendación completa: {rec}")
+                
+                # 🔑 NUEVO: Resolver conflictos de secuencia
+                secuencia_final = resolver_conflicto_secuencia(
+                    route_id=route_id,
+                    itinerario=itinerario,
+                    secuencia_vecino=secuencia,
+                    secuencia_sugerida_inicial=secuencia_sugerida_inicial,
+                    secuencias_ocupadas=secuencias_ocupadas,
+                    conn=conn
+                )
+                
+                # Convertir None a cadena vacía para Excel
+                # IMPORTANTE: Usar nombres diferentes para no sobrescribir las columnas originales
+                fila_resultado.update({
+                    'ROUTE_ID_VECINO': str(route_id) if route_id is not None else '',
+                    'ROUTE_ITINERARY_ID_VECINO': str(itinerario) if itinerario is not None else '',
+                    'SECUENCIA_VECINO': str(secuencia) if secuencia is not None else '',
+                    'SECUENCIA_SUGERIDA': str(secuencia_final) if secuencia_final is not None else '',
+                    'OBSERVACION': 'ENCONTRADO'
+                })
+            else:
+                error_msg = resultado_busqueda.get('error', 'No se encontraron candidatos')
+                fila_resultado.update({
+                    'ROUTE_ID_VECINO': '',
+                    'ROUTE_ITINERARY_ID_VECINO': '',
+                    'SECUENCIA_VECINO': '',
+                    'SECUENCIA_SUGERIDA': '',
+                    'OBSERVACION': error_msg
+                })
+            
+            resultados.append(fila_resultado)
+            
+            # Actualizar progreso y mostrar estadísticas cada 50 productos
+            with procesamiento_masivo_lock:
+                procesamiento_masivo_estado[session_id]['procesados'] = idx + 1
+                
+                # Log detallado cada 50 productos
+                if (idx + 1) % 50 == 0:
+                    tiempo_transcurrido = time.time() - tiempo_inicio_procesamiento
+                    promedio_por_producto = tiempo_total_busquedas / (idx + 1)
+                    productos_restantes = total_productos - (idx + 1)
+                    tiempo_estimado_restante = promedio_por_producto * productos_restantes
+                    
+                    print(f"[{session_id}] Progreso: {idx + 1}/{total_productos} ({((idx + 1)/total_productos*100):.1f}%)")
+                    print(f"[{session_id}] Tiempo promedio: {promedio_por_producto:.2f}s/producto")
+                    print(f"[{session_id}] Tiempo estimado restante: {tiempo_estimado_restante/60:.1f} minutos")
+                elif (idx + 1) % 10 == 0:
+                    print(f"[{session_id}] Procesado {idx + 1}/{total_productos}")
+        
+        # Métricas finales
+        tiempo_total_procesamiento = time.time() - tiempo_inicio_procesamiento
+        promedio_final = tiempo_total_busquedas / total_productos if total_productos > 0 else 0
+        
+        # Calcular estadísticas de secuencias
+        total_itinerarios_unicos = len(secuencias_ocupadas)
+        total_secuencias_asignadas = sum(len(secuencias) for secuencias in secuencias_ocupadas.values())
+        
+        print(f"[{session_id}] ============ MÉTRICAS FINALES ============")
+        print(f"[{session_id}] Total productos: {total_productos}")
+        print(f"[{session_id}] Tiempo total: {tiempo_total_procesamiento/60:.2f} minutos")
+        print(f"[{session_id}] Promedio por producto: {promedio_final:.2f}s")
+        print(f"[{session_id}] Itinerarios únicos procesados: {total_itinerarios_unicos}")
+        print(f"[{session_id}] Secuencias asignadas (incluye ajustes): {total_secuencias_asignadas}")
+        print(f"[{session_id}] ==========================================")
+        
+        # Crear DataFrame con resultados
+        df_resultado = pd.DataFrame(resultados)
+        
+        # 🔍 VERIFICACIÓN DE DUPLICADOS
+        # Filtrar solo los productos con vecinos encontrados
+        df_encontrados = df_resultado[df_resultado['OBSERVACION'] == 'ENCONTRADO'].copy()
+        
+        if not df_encontrados.empty:
+            # Verificar duplicados por cada itinerario
+            duplicados_encontrados = False
+            for (route_id, itinerario), grupo in df_encontrados.groupby(['ROUTE_ID_VECINO', 'ROUTE_ITINERARY_ID_VECINO']):
+                secuencias = grupo['SECUENCIA_SUGERIDA'].tolist()
+                secuencias_unicas = set(secuencias)
+                
+                if len(secuencias) != len(secuencias_unicas):
+                    duplicados_encontrados = True
+                    duplicados = [s for s in secuencias if secuencias.count(s) > 1]
+                    print(f"[ERROR] Duplicados detectados en Route {route_id}, Itinerario {itinerario}:")
+                    print(f"        Secuencias duplicadas: {set(duplicados)}")
+                    print(f"        Total productos en este itinerario: {len(secuencias)}")
+                    print(f"        Secuencias únicas: {len(secuencias_unicas)}")
+            
+            if not duplicados_encontrados:
+                print(f"[{session_id}] ✅ No se detectaron secuencias duplicadas")
+            else:
+                print(f"[{session_id}] ⚠️  Se detectaron secuencias duplicadas (ver logs arriba)")
+        
+        # Generar nombre de archivo
+        output_filename = f'resultados_masivos_{session_id}.xlsx'
+        output_path = os.path.join('/tmp', output_filename)
+        
+        # Guardar archivo Excel
+        df_resultado.to_excel(output_path, index=False, engine='openpyxl')
+        
+        # Actualizar estado final
+        with procesamiento_masivo_lock:
+            procesamiento_masivo_estado[session_id]['status'] = 'completado'
+            procesamiento_masivo_estado[session_id]['completado'] = True
+            procesamiento_masivo_estado[session_id]['filename'] = output_filename
+        
+        print(f"[{session_id}] Procesamiento completado: {total_productos} productos")
+        
+    except Exception as e:
+        error_message = f"Error en el procesamiento de fondo: {str(e)}"
+        print(f"[{session_id}] {error_message}")
+        import traceback
+        traceback.print_exc()  # Imprimir el traceback completo para depuración
+        with procesamiento_masivo_lock:
+            if session_id in procesamiento_masivo_estado:
+                procesamiento_masivo_estado[session_id]['status'] = 'error'
+                procesamiento_masivo_estado[session_id]['error'] = error_message
+            else:
+                print(f"[{session_id}] No se pudo actualizar el estado a 'error' porque la sesión ya no existe.")
+    
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/progreso-masivo/<session_id>')
+def progreso_masivo(session_id):
+    """
+    Retorna el progreso actual del procesamiento
+    """
+    with procesamiento_masivo_lock:
+        if session_id not in procesamiento_masivo_estado:
+            print(f"[PROGRESO] Sesión {session_id} NO encontrada. Sesiones activas: {list(procesamiento_masivo_estado.keys())}")
+            return jsonify({"error": "Sesión no encontrada"}), 404
+        
+        estado = procesamiento_masivo_estado[session_id].copy()
+        print(f"[PROGRESO] Sesión {session_id}: {estado['procesados']}/{estado['total']} - Status: {estado['status']}")
+    
+    return jsonify(estado)
+
+@app.route('/api/cancelar-masivo/<session_id>', methods=['POST'])
+def cancelar_masivo(session_id):
+    """
+    Cancela el procesamiento masivo
+    """
+    with procesamiento_masivo_lock:
+        if session_id not in procesamiento_masivo_estado:
+            return jsonify({"error": "Sesión no encontrada"}), 404
+        
+        procesamiento_masivo_estado[session_id]['cancelado'] = True
+    
+    return jsonify({"success": True, "mensaje": "Cancelación solicitada"})
+
+@app.route('/descargar-resultado/<filename>')
+def descargar_resultado(filename):
+    """
+    Descarga el archivo de resultados generado
+    """
+    try:
+        # Validar filename para seguridad
+        if not filename.startswith('resultados_masivos_') or not filename.endswith('.xlsx'):
+            return jsonify({"error": "Nombre de archivo inválido"}), 400
+        
+        filepath = os.path.join('/tmp', filename)
+        
+        if not os.path.exists(filepath):
+            return jsonify({"error": "Archivo no encontrado"}), 404
+        
+        return send_file(
+            filepath,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    
+    except Exception as e:
+        return jsonify({"error": f"Error al descargar archivo: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

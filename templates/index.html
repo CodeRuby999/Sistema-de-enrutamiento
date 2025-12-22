@@ -19,140 +19,337 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 40px 20px;
+            overflow-x: hidden;
         }
 
         .container {
-            max-width: 720px;
+            max-width: 1200px;
             width: 100%;
+            position: relative;
+            padding-top: 80px; /* Espacio para el logo fijo */
+        }
+
+        /* Botón de toggle para modo arrastre */
+        .drag-toggle {
+            position: fixed;
+            top: 25px;
+            right: 25px;
+            background: transparent;
+            color: #94a3b8;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 9999;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+        }
+
+        .drag-toggle:hover {
+            transform: scale(1.15);
+            filter: drop-shadow(0 4px 12px rgba(148, 163, 184, 0.6));
+        }
+
+        .drag-toggle.unlocked {
+            color: #8b5cf6;
+        }
+
+        .drag-toggle.unlocked:hover {
+            filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.6));
+        }
+
+        .drag-toggle i {
+            font-size: 1.4rem;
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 35px;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 9998;
             animation: fadeInDown 0.8s ease;
         }
 
         .header h1 {
             color: white;
-            font-size: 2.2rem;
+            font-size: 1.5rem;
             font-weight: 800;
-            margin-bottom: 8px;
+            margin: 0;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 12px;
+            gap: 10px;
+            text-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);
         }
 
         .header h1 i {
             color: #667eea;
+            font-size: 1.5rem;
+            animation: pulse 2s infinite;
         }
 
         .header p {
-            color: #94a3b8;
-            font-size: 1rem;
+            display: none; /* Ocultar el subtítulo */
         }
 
+        /* Mensaje de subtítulo centrado */
+        .subtitle-message {
+            text-align: center;
+            margin-top: -30px;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .subtitle-message p {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .subtitle-message p i {
+            color: rgba(148, 163, 184, 0.6);
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-top: 2px; /* Ajuste fino para centrado perfecto */
+        }
+
+        /* Contenedor hexagonal tipo panal */
         .options-container {
+            position: relative; /* Necesario para posicionamiento absoluto de hijos */
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1000px;
+            min-height: 600px; /* Altura mínima para arrastrar */
+            margin: 0 auto;
+            padding: 20px;
+            gap: 0; /* Sin gap para alineamiento perfecto */
+        }
+
+        /* Hexágono usando clip-path */
+        .option-card {
+            position: relative;
+            width: 220px !important; /* Forzar mismo ancho para todos */
+            height: 240px !important; /* Forzar misma altura para todos */
+            min-width: 220px;
+            max-width: 220px;
+            min-height: 240px;
+            max-height: 240px;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            cursor: pointer; /* Cursor pointer por defecto, se cambia con JS */
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
             display: flex;
             flex-direction: column;
-            gap: 18px;
-        }
-
-        .option-card {
-            background: #1e293b;
-            border-radius: 16px;
-            padding: 28px 32px;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 2px solid transparent;
-            text-decoration: none;
-            display: block;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 25px;
             animation: fadeInUp 0.8s ease;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            margin: 0 -55px 0 0; /* Overlap horizontal para panal */
+            user-select: none; /* Evitar selección de texto al arrastrar */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            flex-shrink: 0; /* Prevenir que se compriman */
         }
 
+        .option-card:active {
+            cursor: grabbing; /* Cambiar cursor al arrastrar */
+        }
+
+        /* Desactivar transiciones durante el arrastre */
+        .option-card.dragging {
+            transition: none !important;
+            box-shadow: 0 25px 60px rgba(102, 126, 234, 0.6);
+            transform: scale(1.05);
+            z-index: 1000 !important;
+        }
+
+        /* Borde del hexágono */
+        .option-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: -1;
+        }
+
+        .option-card:hover::before {
+            opacity: 0.2;
+        }
+
+        /* Posicionamiento perfecto tipo panal - Diseño 3-2 */
         .option-card:nth-child(1) {
             animation-delay: 0.1s;
+            margin-top: 0; /* Fila superior - izquierda */
         }
 
         .option-card:nth-child(2) {
             animation-delay: 0.2s;
+            margin-top: 0; /* Fila superior - centro */
         }
 
         .option-card:nth-child(3) {
             animation-delay: 0.3s;
+            margin-top: 0; /* Fila superior - derecha */
+        }
+
+        .option-card:nth-child(4) {
+            animation-delay: 0.4s;
+            margin-top: 90px; /* Fila inferior - izquierda */
+            margin-left: 55px; /* Desplazar a la derecha para centrar */
+        }
+
+        .option-card:nth-child(5) {
+            animation-delay: 0.5s;
+            margin-top: 90px; /* Fila inferior - derecha */
+            margin-right: 0;
         }
 
         .option-card:hover {
-            transform: translateY(-5px);
-            border-color: #667eea;
-            box-shadow: 0 15px 45px rgba(102, 126, 234, 0.4);
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            transform: scale(1.1) translateY(-10px);
+            box-shadow: 0 25px 60px rgba(102, 126, 234, 0.5);
+            z-index: 10;
+        }
+
+        /* Desactivar hover cuando el modo arrastre está activo */
+        body.drag-mode-active .option-card:hover {
+            transform: none;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 1;
+        }
+
+        body.drag-mode-active .option-card:hover::before {
+            opacity: 0;
+        }
+
+        body.drag-mode-active .option-card:hover .option-icon {
+            transform: none;
+        }
+
+        body.drag-mode-active .option-card:hover .option-description {
+            opacity: 0;
+            max-height: 0;
         }
 
         .option-content {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 22px;
+            text-align: center;
+            gap: 15px;
+            z-index: 1;
         }
 
         .option-icon {
-            width: 64px;
-            height: 64px;
+            width: 70px;
+            height: 70px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 2rem;
             color: white;
             flex-shrink: 0;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+            transition: transform 0.5s ease;
+        }
+
+        .option-card:hover .option-icon {
+            transform: rotate(360deg);
         }
 
         .option-card:nth-child(2) .option-icon {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
         }
 
         .option-card:nth-child(3) .option-icon {
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+        }
+
+        .option-card:nth-child(4) .option-icon {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+        }
+
+        .option-card:nth-child(5) .option-icon {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
         }
 
         .option-text {
-            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+            overflow: hidden; /* Prevenir que el texto expanda el hexágono */
         }
 
         .option-title {
             color: white;
-            font-size: 1.4rem;
+            font-size: 1.05rem;
             font-weight: 700;
-            margin-bottom: 6px;
+            line-height: 1.3;
+            text-align: center;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
         }
 
         .option-description {
-            color: #94a3b8;
-            font-size: 0.9rem;
-            line-height: 1.5;
+            color: #cbd5e1;
+            font-size: 0.75rem;
+            line-height: 1.3;
+            text-align: center;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+
+        .option-card:hover .option-description {
+            opacity: 1;
+            max-height: 100px;
         }
 
         .option-arrow {
-            color: #667eea;
-            font-size: 1.3rem;
-            transition: transform 0.3s ease;
-        }
-
-        .option-card:hover .option-arrow {
-            transform: translateX(8px);
+            display: none; /* No se usa en diseño hexagonal */
         }
 
         .footer {
             text-align: center;
-            margin-top: 30px;
+            margin-top: 20px;
             color: #64748b;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             animation: fadeIn 1s ease 0.5s both;
+        }
+
+        .footer i {
+            margin-right: 8px;
+            color: #667eea;
         }
 
         @keyframes fadeInDown {
@@ -177,6 +374,15 @@
             }
         }
 
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -186,48 +392,193 @@
             }
         }
 
-        @media (max-width: 768px) {
+        /* Responsive para tablets */
+        @media (max-width: 1024px) {
+            .container {
+                padding-top: 70px; /* Ajustar espacio para el logo en tablet */
+            }
+
             .header h1 {
-                font-size: 1.8rem;
+                font-size: 1.4rem;
             }
 
-            .option-content {
-                flex-direction: column;
-                text-align: center;
-                gap: 16px;
+            .header h1 i {
+                font-size: 1.4rem;
             }
 
-            .option-icon {
-                width: 56px;
-                height: 56px;
-                font-size: 1.7rem;
+            .subtitle-message {
+                margin-top: -25px;
+                margin-bottom: 35px;
             }
 
-            .option-title {
-                font-size: 1.3rem;
+            .subtitle-message p {
+                font-size: 0.9rem;
             }
 
-            .option-arrow {
-                display: none;
+            .subtitle-message p i {
+                font-size: 0.85rem;
+            }
+
+            .options-container {
+                padding: 20px;
             }
 
             .option-card {
-                padding: 24px;
+                width: 180px;
+                height: 200px;
+                padding: 30px 20px;
+                margin: 0 -45px 0 0;
+            }
+
+            .option-card:nth-child(1) {
+                margin-top: 0;
+            }
+
+            .option-card:nth-child(2) {
+                margin-top: 0;
+            }
+
+            .option-card:nth-child(3) {
+                margin-top: 0;
+            }
+
+            .option-card:nth-child(4) {
+                margin-top: 75px;
+                margin-left: 45px;
+            }
+
+            .option-card:nth-child(5) {
+                margin-top: 75px;
+                margin-right: 0;
+            }
+
+            .option-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.8rem;
+            }
+
+            .option-title {
+                font-size: 0.95rem;
+            }
+
+            .footer {
+                margin-top: 20px;
+            }
+        }
+
+        /* Responsive para móviles */
+        @media (max-width: 768px) {
+            .container {
+                padding-top: 65px; /* Ajustar espacio para el logo en móvil */
+            }
+
+            .header h1 {
+                font-size: 1.3rem;
+            }
+
+            .header h1 i {
+                font-size: 1.3rem;
+            }
+
+            .header p {
+                display: none;
+            }
+
+            .subtitle-message {
+                margin-top: -20px;
+                margin-bottom: 30px;
+            }
+
+            .subtitle-message p {
+                font-size: 0.85rem;
+            }
+
+            .subtitle-message p i {
+                font-size: 0.8rem;
+            }
+
+            .options-container {
+                flex-direction: column;
+                align-items: center;
+                padding: 10px;
+            }
+
+            .option-card {
+                width: 200px !important;
+                height: 220px !important;
+                min-width: 200px;
+                max-width: 200px;
+                min-height: 220px;
+                max-height: 220px;
+                padding: 35px 20px;
+                margin: 15px 0 !important; /* Espaciado vertical en móvil */
+            }
+
+            .option-card:nth-child(1),
+            .option-card:nth-child(2),
+            .option-card:nth-child(3),
+            .option-card:nth-child(4),
+            .option-card:nth-child(5) {
+                margin-top: 15px !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+
+            .option-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.8rem;
+            }
+
+            .option-title {
+                font-size: 0.95rem;
+            }
+
+            .option-description {
+                font-size: 0.7rem;
+            }
+
+            .footer {
+                margin-top: 20px;
+                font-size: 0.85rem;
             }
         }
     </style>
 </head>
 <body>
+    <!-- Notificación de procesamiento en curso -->
+    <div id="notificacionProcesando" style="display: none; position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 10px 30px rgba(139, 92, 246, 0.5); z-index: 10000; animation: slideInRight 0.5s ease;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <i class="fas fa-spinner fa-spin"></i>
+            <div>
+                <div style="font-weight: 600; font-size: 0.95rem;">Procesamiento en curso</div>
+                <div id="notificacionDetalle" style="font-size: 0.85rem; opacity: 0.9; margin-top: 3px;">Búsqueda masiva en segundo plano</div>
+            </div>
+            <a href="/buscar-masivo" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-left: 10px;">
+                Ver Progreso
+            </a>
+        </div>
+    </div>
+
     <div class="container">
+        <!-- Botón para activar/desactivar modo arrastre -->
+
+        <!-- Botón para activar/desactivar modo arrastre -->
+        <button id="toggleDrag" class="drag-toggle" title="Activar/Desactivar modo arrastre">
+            <i class="fas fa-lock"></i>
+        </button>
+
         <div class="header">
-            <h1>
-                <i class="fas fa-route"></i>
-                Sistema de Enrutamiento
-            </h1>
-            <p>Selecciona el tipo de búsqueda que deseas realizar</p>
+            <h1><i class="fas fa-route"></i> SRut</h1>
+        </div>
+
+        <div class="subtitle-message">
+            <p><i class="fas fa-info-circle"></i> Selecciona el tipo de búsqueda que deseas realizar</p>
         </div>
 
         <div class="options-container">
+            <!-- Fila superior: 3 hexágonos -->
             <a href="/buscar-product" class="option-card">
                 <div class="option-content">
                     <div class="option-icon">
@@ -239,12 +590,38 @@
                             Encuentra productos y sus vecinos más cercanos utilizando el identificador único del producto
                         </div>
                     </div>
-                    <div class="option-arrow">
-                        <i class="fas fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="/buscar-masivo" class="option-card">
+                <div class="option-content">
+                    <div class="option-icon">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="option-text">
+                        <div class="option-title">Búsqueda Masiva (Excel)</div>
+                        <div class="option-description">
+                            Carga un archivo Excel con múltiples productos y obtén candidatos para todos de una vez
+                        </div>
                     </div>
                 </div>
             </a>
 
+            <a href="/buscar-cuenta" class="option-card">
+                <div class="option-content">
+                    <div class="option-icon">
+                        <i class="fas fa-id-card"></i>
+                    </div>
+                    <div class="option-text">
+                        <div class="option-title">Buscar por Cuenta</div>
+                        <div class="option-description">
+                            Encuentra productos utilizando el número de cuenta (Subscription ID) del cliente
+                        </div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Fila inferior: 2 hexágonos centrados -->
             <a href="/buscar-coordenadas" class="option-card">
                 <div class="option-content">
                     <div class="option-icon">
@@ -255,9 +632,6 @@
                         <div class="option-description">
                             Geocodifica ubicaciones y encuentra productos en zonas específicas usando latitud y longitud
                         </div>
-                    </div>
-                    <div class="option-arrow">
-                        <i class="fas fa-arrow-right"></i>
                     </div>
                 </div>
             </a>
@@ -273,17 +647,242 @@
                             Construye una dirección paso a paso con autocompletado y encuentra productos en esa ubicación
                         </div>
                     </div>
-                    <div class="option-arrow">
-                        <i class="fas fa-arrow-right"></i>
-                    </div>
                 </div>
             </a>
         </div>
 
         <div class="footer">
-            <i class="fas fa-info-circle"></i> Haz clic en cualquier opción para comenzar
+            <div style="margin-bottom: 8px;">
+                <i class="fas fa-hand-pointer"></i> Haz clic en cualquier opción para comenzar
+            </div>
+            <div style="font-size: 0.85rem; color: #8b5cf6;">
+                <i class="fas fa-unlock"></i> Usa el candado para reorganizar • 
+                <i class="fas fa-redo"></i> Doble clic para resetear
+            </div>
         </div>
     </div>
+
+    <script>
+        // Verificar procesamiento masivo en curso
+        document.addEventListener('DOMContentLoaded', function() {
+            (function verificarProcesamientoMasivo() {
+                const sessionId = localStorage.getItem('masivo_session_id');
+                
+                if (sessionId) {
+                    fetch(`/api/progreso-masivo/${sessionId}`)
+                        .then(response => {
+                            if (response.status === 404) {
+                                // Si la sesión no se encuentra, significa que ya terminó y fue limpiada.
+                                // Limpiar localmente y detener la verificación.
+                                console.log('Sesión finalizada y limpiada del servidor. Limpiando localmente.');
+                                document.getElementById('notificacionProcesando').style.display = 'none';
+                                localStorage.removeItem('masivo_session_id');
+                                localStorage.removeItem('masivo_tiempo_inicio');
+                                return Promise.reject('Sesión no encontrada, finalizando sondeo.');
+                            }
+                            if (!response.ok) {
+                                throw new Error('No se pudo obtener el estado del servidor');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            const notificacion = document.getElementById('notificacionProcesando');
+                            const notificacionDetalle = document.getElementById('notificacionDetalle');
+                            const spinnerIcon = notificacion.querySelector('i');
+
+                            if (data.completado) {
+                                // Estado: Completado
+                                notificacionDetalle.textContent = '¡Procesamiento completado!';
+                                spinnerIcon.className = 'fas fa-check-circle';
+                                notificacion.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                                notificacion.style.display = 'block';
+
+                                // Ocultar después de 5 segundos, pero NO limpiar el session ID.
+                                // La página de búsqueda masiva se encargará de la limpieza.
+                                setTimeout(() => {
+                                    notificacion.style.display = 'none';
+                                    // Restaurar estilo original para futuras notificaciones
+                                    spinnerIcon.className = 'fas fa-spinner fa-spin';
+                                    notificacion.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';
+                                }, 5000);
+                                // Detener la verificación en esta página, ya que el proceso ha terminado.
+                                return;
+
+                            } else if (!data.cancelado && data.status !== 'error') {
+                                // Estado: En progreso
+                                const porcentaje = Math.round((data.procesados / data.total) * 100);
+                                notificacionDetalle.textContent = `${data.procesados} de ${data.total} productos (${porcentaje}%)`;
+                                notificacion.style.display = 'block';
+                                setTimeout(verificarProcesamientoMasivo, 2000); // Continuar verificando
+
+                            } else {
+                                // Estado: Cancelado, Error o Inactivo
+                                notificacion.style.display = 'none';
+                                localStorage.removeItem('masivo_session_id');
+                                localStorage.removeItem('masivo_tiempo_inicio');
+                            }
+                        })
+                        .catch((error) => {
+                            console.log('Error verificando procesamiento masivo:', error);
+                            document.getElementById('notificacionProcesando').style.display = 'none';
+                        });
+                }
+            })();
+
+            // ===== DRAG & DROP DE HEXÁGONOS (CON POSICIÓN PREDETERMINADA) =====
+            const cards = document.querySelectorAll('.option-card');
+            const toggleButton = document.getElementById('toggleDrag');
+            
+            // Posiciones predeterminadas para un diseño simétrico
+            const defaultPositions = {
+                'http://127.0.0.1:5000/buscar-product': { left: 155, top: 0 },
+                'http://127.0.0.1:5000/buscar-direccion': { left: 390, top: 0 },
+                'http://127.0.0.1:5000/buscar-masivo': { left: 625, top: 0 },
+                'http://127.0.0.1:5000/buscar-coordenadas': { left: 272.5, top: 190 },
+                'http://127.0.0.1:5000/buscar-cuenta': { left: 507.5, top: 190 }
+            };
+
+            let isDragMode = false;
+            let isDragging = false;
+            let currentCard = null;
+            let offsetX = 0, offsetY = 0;
+
+            // Función para aplicar una posición a una tarjeta
+            function applyPosition(card, pos) {
+                card.style.position = 'absolute';
+                card.style.left = pos.left + 'px';
+                card.style.top = pos.top + 'px';
+                card.style.margin = '0';
+            }
+
+            // Toggle para activar/desactivar modo arrastre
+            toggleButton.addEventListener('click', () => {
+                isDragMode = !isDragMode;
+                document.body.classList.toggle('drag-mode-active', isDragMode);
+                toggleButton.classList.toggle('unlocked', isDragMode);
+                toggleButton.querySelector('i').className = isDragMode ? 'fas fa-unlock' : 'fas fa-lock';
+                toggleButton.title = isDragMode ? 'Desactivar modo arrastre' : 'Activar modo arrastre';
+                cards.forEach(card => card.style.cursor = isDragMode ? 'grab' : 'pointer');
+            });
+
+            // Inicializar tarjetas
+            cards.forEach(card => {
+                card.style.cursor = 'pointer';
+
+                // Prevenir navegación si estamos en modo arrastre
+                card.addEventListener('click', (e) => {
+                    if (isDragMode) e.preventDefault();
+                });
+
+                // Determinar la URL base para la clave de posición
+                const url = new URL(card.href);
+                const keyBase = `http://127.0.0.1:5000${url.pathname}`;
+
+                // Cargar posición guardada o aplicar la predeterminada
+                const savedPosition = localStorage.getItem(`hex-position-${card.href}`);
+                if (savedPosition) {
+                    applyPosition(card, JSON.parse(savedPosition));
+                } else if (defaultPositions[keyBase]) {
+                    applyPosition(card, defaultPositions[keyBase]);
+                }
+
+                function startDrag(e) {
+                    if (!isDragMode) return;
+                    e.preventDefault();
+
+                    isDragging = true;
+                    currentCard = card;
+
+                    const containerRect = document.querySelector('.options-container').getBoundingClientRect();
+                    const cardRect = card.getBoundingClientRect();
+
+                    // Asegurarse de que la tarjeta sea absoluta para el cálculo
+                    if (card.style.position !== 'absolute') {
+                        card.style.position = 'absolute';
+                        card.style.left = (cardRect.left - containerRect.left) + 'px';
+                        card.style.top = (cardRect.top - containerRect.top) + 'px';
+                        card.style.margin = '0';
+                    }
+
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                    offsetX = clientX - cardRect.left;
+                    offsetY = clientY - cardRect.top;
+
+                    card.classList.add('dragging');
+                    card.style.cursor = 'grabbing';
+                }
+
+                card.addEventListener('mousedown', startDrag);
+                card.addEventListener('touchstart', startDrag, { passive: false });
+            });
+
+            function drag(e) {
+                if (!isDragging || !currentCard) return;
+                e.preventDefault();
+
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                const containerRect = document.querySelector('.options-container').getBoundingClientRect();
+                let newX = clientX - containerRect.left - offsetX;
+                let newY = clientY - containerRect.top - offsetY;
+                
+                // Limitar al contenedor
+                const cardWidth = 220, cardHeight = 240;
+                newX = Math.max(0, Math.min(newX, containerRect.width - cardWidth));
+                newY = Math.max(0, Math.min(newY, containerRect.height - cardHeight));
+
+                currentCard.style.left = newX + 'px';
+                currentCard.style.top = newY + 'px';
+            }
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('touchmove', drag, { passive: false });
+
+            function endDrag() {
+                if (!isDragging || !currentCard) return;
+
+                isDragging = false;
+                currentCard.classList.remove('dragging');
+                currentCard.style.cursor = isDragMode ? 'grab' : 'pointer';
+
+                // Guardar la nueva posición
+                const positionToSave = { left: parseFloat(currentCard.style.left), top: parseFloat(currentCard.style.top) };
+                localStorage.setItem(`hex-position-${currentCard.href}`, JSON.stringify(positionToSave));
+
+                currentCard = null;
+            }
+
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+
+            // Doble clic para resetear posiciones
+            document.querySelector('.options-container').addEventListener('dblclick', () => {
+                if (!isDragMode) return;
+                if (confirm('¿Deseas resetear la posición de todos los hexágonos a la vista predeterminada?')) {
+                    cards.forEach(card => {
+                        localStorage.removeItem(`hex-position-${card.href}`);
+                    });
+                    location.reload();
+                }
+            });
+        });
+    </script>
+
+    <style>
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </body>
 </html>
 
